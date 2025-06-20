@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Platform, TouchableOpacity, StyleSheet, View, Text } from 'react-native';
+import { TouchableOpacity, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -9,42 +9,22 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 export default function TabLayout() {
   const colorScheme = useColorScheme();
 
-  const UploadButton = ({ children }) => {
-    return (
-      <TouchableOpacity
-        style={styles.uploadButton}
-        onPress={() => router.push('/breed-detector')}
-      >
-        <Ionicons name="add" size={36} color="#FFFFFF" />
-      </TouchableOpacity>
-    );
-  };
-
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#FFFFFF',
-        tabBarInactiveTintColor: '#666666',
         headerShown: false,
         tabBarStyle: {
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: 80,
-          backgroundColor: '#121212',
-          borderTopWidth: 0,
-          elevation: 0,
+          display: 'none',
         },
       }}
-      tabBar={(props) => (
-        <View style={styles.tabBar}>
-          <View style={styles.centerButtonContainer}>
-            <UploadButton />
-          </View>
-        </View>
-      )}
     >
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Home',
+        }}
+      />
+      
       <Tabs.Screen
         name="upload"
         options={{
@@ -55,31 +35,28 @@ export default function TabLayout() {
   );
 }
 
+// Floating action button component to be used in the home screen
+export function FloatingActionButton() {
+  return (
+    <TouchableOpacity
+      style={styles.fab}
+      onPress={() => router.push('/breed-detector')}
+    >
+      <Ionicons name="add" size={32} color="#FFFFFF" />
+    </TouchableOpacity>
+  );
+}
+
 const styles = StyleSheet.create({
-  tabBar: {
-    flexDirection: 'row',
+  fab: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 80,
-    backgroundColor: '#121212',
-    paddingBottom: 15,
-    paddingTop: 5,
-  },
-  centerButtonContainer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  uploadButton: {
-    width: 80,
-    height: 80,
+    bottom: 25,
+    left: '50%',
+    marginLeft: -35, // Half of the width to center it
+    width: 70,
+    height: 70,
+    borderRadius: 35,
     backgroundColor: '#7B4B94',
-    borderRadius: 40,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
