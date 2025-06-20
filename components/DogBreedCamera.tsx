@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { StyleSheet, View, TouchableOpacity, Text, Image, Platform } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, Text, Image, Platform, ScrollView } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { MediaType } from 'expo-image-picker';
 import { GoogleGenerativeAI } from '@google/generative-ai';
@@ -13,6 +13,14 @@ interface LocationData {
   altitude?: number;
 }
 
+interface DogStats {
+  intelligenceRanking: string;
+  energyLevel: string;
+  sheddingLevel: string;
+  droolingTendency: string;
+  barkingLevel: string;
+}
+
 interface Props {
   onBreedDetected?: (breed: string, funFact?: string, likeness?: number, location?: LocationData) => void;
 }
@@ -22,6 +30,7 @@ export default function DogBreedCamera({ onBreedDetected }: Props) {
   const [breed, setBreed] = useState<string | null>(null);
   const [funFact, setFunFact] = useState<string | null>(null);
   const [likeness, setLikeness] = useState<number | null>(null);
+  const [dogStats, setDogStats] = useState<DogStats | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [location, setLocation] = useState<LocationData | undefined>(undefined);
@@ -358,6 +367,14 @@ If it's something else:
         setBreed(detectedBreed);
         setFunFact(detectedFunFact);
         setLikeness(detectedLikeness);
+        // Add default stats
+        setDogStats({
+          intelligenceRanking: "#4 out of 138 (very trainable)",
+          energyLevel: "High",
+          sheddingLevel: "Moderate to High",
+          droolingTendency: "Low",
+          barkingLevel: "Moderate"
+        });
         console.log(`Detected: Type=${detectionResult.type}, ID=${detectedBreed}, Likeness=${detectedLikeness}, FunFact=${detectedFunFact}`);
         
         if (onBreedDetected) {
@@ -396,7 +413,7 @@ If it's something else:
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       {photo ? (
         <View style={styles.previewContainer}>
           <Image source={{ uri: photo }} style={styles.preview} resizeMode="contain" />
@@ -412,6 +429,33 @@ If it's something else:
                 <View style={styles.funFactContainer}>
                   <Text style={styles.funFactTitle}>Fun Fact:</Text>
                   <Text style={styles.funFactText}>{funFact}</Text>
+                </View>
+              )}
+              {dogStats && (
+                <View style={styles.statsContainer}>
+                  <Text style={styles.statsTitle}>Dog Stats:</Text>
+                  <View style={styles.statsGrid}>
+                    <View style={styles.statItem}>
+                      <Text style={styles.statLabel}>Intelligence:</Text>
+                      <Text style={styles.statValue}>{dogStats.intelligenceRanking}</Text>
+                    </View>
+                    <View style={styles.statItem}>
+                      <Text style={styles.statLabel}>Energy:</Text>
+                      <Text style={styles.statValue}>{dogStats.energyLevel}</Text>
+                    </View>
+                    <View style={styles.statItem}>
+                      <Text style={styles.statLabel}>Shedding:</Text>
+                      <Text style={styles.statValue}>{dogStats.sheddingLevel}</Text>
+                    </View>
+                    <View style={styles.statItem}>
+                      <Text style={styles.statLabel}>Drooling:</Text>
+                      <Text style={styles.statValue}>{dogStats.droolingTendency}</Text>
+                    </View>
+                    <View style={styles.statItem}>
+                      <Text style={styles.statLabel}>Barking:</Text>
+                      <Text style={styles.statValue}>{dogStats.barkingLevel}</Text>
+                    </View>
+                  </View>
                 </View>
               )}
               {location && (
@@ -430,6 +474,7 @@ If it's something else:
                 setBreed(null);
                 setFunFact(null);
                 setLikeness(null);
+                setDogStats(null);
                 setLocation(undefined);
               }}>
                 <Text style={styles.buttonText}>Take Another Photo</Text>
@@ -487,7 +532,7 @@ If it's something else:
           </View>
         </View>
       )}
-    </View>
+    </ScrollView>
   );
 }
 
@@ -495,6 +540,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#121212',
+  },
+  contentContainer: {
+    flexGrow: 1,
+    minHeight: '100%',
   },
   cameraContainer: {
     flex: 1,
@@ -598,6 +647,38 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     lineHeight: 22,
+  },
+  statsContainer: {
+    backgroundColor: 'rgba(123, 75, 148, 0.3)',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 20,
+    width: '100%',
+  },
+  statsTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  statsGrid: {
+    flexDirection: 'column',
+    gap: 8,
+  },
+  statItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  statLabel: {
+    color: '#ddd',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  statValue: {
+    color: '#fff',
+    fontSize: 14,
   },
   locationContainer: {
     backgroundColor: 'rgba(0, 128, 255, 0.3)',
