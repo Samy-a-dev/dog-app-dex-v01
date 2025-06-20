@@ -1,7 +1,7 @@
+import { StyleSheet, TouchableOpacity } from 'react-native';
 import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { router } from 'expo-router';
 
-import { HelloWave } from '@/components/HelloWave';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -9,47 +9,46 @@ import { ThemedView } from '@/components/ThemedView';
 export default function HomeScreen() {
   return (
     <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
+      headerBackgroundColor={{ light: '#7B4B94', dark: '#3A1D4A' }}
       headerImage={
         <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
+          source={{ uri: 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1074&q=80' }}
+          style={styles.dogImage}
         />
       }>
       <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
+        <ThemedText type="title">Dog Breed Detector</ThemedText>
       </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
+      
+      <ThemedView style={styles.descriptionContainer}>
         <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
+          Take a photo of any dog and instantly identify its breed using AI-powered image recognition.
         </ThemedText>
       </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
+      
+      <TouchableOpacity 
+        style={styles.cameraButton} 
+        onPress={() => router.push('/breed-detector')}
+      >
+        <ThemedText style={styles.buttonText}>Open Camera</ThemedText>
+      </TouchableOpacity>
+      
+      <ThemedView style={styles.featuresContainer}>
+        <ThemedText type="subtitle">Features</ThemedText>
+        <ThemedView style={styles.featureItem}>
+          <ThemedText type="defaultSemiBold">• Instant Breed Detection</ThemedText>
+          <ThemedText>Powered by Google's Gemini AI</ThemedText>
+        </ThemedView>
+        
+        <ThemedView style={styles.featureItem}>
+          <ThemedText type="defaultSemiBold">• Works with All Dog Breeds</ThemedText>
+          <ThemedText>From Chihuahuas to Great Danes</ThemedText>
+        </ThemedView>
+        
+        <ThemedView style={styles.featureItem}>
+          <ThemedText type="defaultSemiBold">• Easy to Use</ThemedText>
+          <ThemedText>Just point, shoot, and discover!</ThemedText>
+        </ThemedView>
       </ThemedView>
     </ParallaxScrollView>
   );
@@ -59,17 +58,44 @@ const styles = StyleSheet.create({
   titleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
+    marginBottom: 20,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  descriptionContainer: {
+    marginBottom: 30,
+    paddingHorizontal: 10,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
+  cameraButton: {
+    backgroundColor: '#7B4B94',
+    paddingVertical: 15,
+    paddingHorizontal: 30,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 40,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  featuresContainer: {
+    gap: 15,
+    marginBottom: 30,
+  },
+  featureItem: {
+    gap: 5,
+    marginBottom: 10,
+  },
+  dogImage: {
+    height: 250,
+    width: '100%',
     bottom: 0,
-    left: 0,
     position: 'absolute',
+    opacity: 0.8,
   },
 });
