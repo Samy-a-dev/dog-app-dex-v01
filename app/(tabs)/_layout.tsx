@@ -39,27 +39,12 @@ export default function TabLayout() {
       }}
       tabBar={(props) => (
         <View style={styles.tabBar}>
-          <TouchableOpacity 
-            style={styles.homeButton}
-            onPress={() => router.push('/')}
-          >
-            <Ionicons name="home" size={24} color="#FFFFFF" />
-            <Text style={styles.tabLabel}>Home</Text>
-          </TouchableOpacity>
-          
           <View style={styles.centerButtonContainer}>
             <UploadButton />
           </View>
         </View>
       )}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-        }}
-      />
-      
       <Tabs.Screen
         name="upload"
         options={{
@@ -81,12 +66,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#121212',
     paddingBottom: 15,
     paddingTop: 5,
-  },
-  homeButton: {
-    position: 'absolute',
-    left: 70,
-    bottom: 25,
-    alignItems: 'center',
   },
   centerButtonContainer: {
     position: 'absolute',
@@ -111,10 +90,5 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
-  },
-  tabLabel: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    marginTop: 4,
   },
 });
