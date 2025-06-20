@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { StyleSheet, View, TouchableOpacity, Text, Image, Platform, ScrollView } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { MediaType } from 'expo-image-picker';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import * as Location from 'expo-location';
 
@@ -75,8 +74,8 @@ export default function DogBreedCamera({ onBreedDetected }: Props) {
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
         timestamp: location.timestamp,
-        accuracy: location.coords.accuracy,
-        altitude: location.coords.altitude
+        accuracy: location.coords.accuracy ?? undefined,
+        altitude: location.coords.altitude ?? undefined
       };
     } catch (error) {
       console.error('Error getting location:', error);
@@ -132,15 +131,13 @@ export default function DogBreedCamera({ onBreedDetected }: Props) {
         
         // Launch camera on native
         const result = await ImagePicker.launchCameraAsync({
-          mediaTypes: 'images',
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
           allowsEditing: true,
           aspect: [4, 3],
           quality: 0.7,
           base64: true,
           exif: true, // Enable EXIF data
         });
-
-        console.log('Native camera result:', result);
 
         console.log('Native camera result:', result);
 
@@ -249,7 +246,7 @@ export default function DogBreedCamera({ onBreedDetected }: Props) {
       // Launch image library
       console.log('Launching image library...');
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: 'images',
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.7,
