@@ -12,6 +12,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { createShadowStyle, createTextShadowStyle } from '@/utils/shadowStyles';
 
@@ -25,6 +26,7 @@ export default function LoginScreen() {
   const [statusMessage, setStatusMessage] = useState('');
   const [statusType, setStatusType] = useState<'success' | 'error' | ''>('');
   const { signIn, signUp, signInWithProvider } = useAuth();
+  const router = useRouter();
 
   const handleEmailAuth = async () => {
     if (!email || !password) {
@@ -38,8 +40,8 @@ export default function LoginScreen() {
     try {
       if (isLogin) {
         await signIn(email, password);
-        setStatusMessage('Login successful!');
-        setStatusType('success');
+        // Skip showing success message and navigate directly to onboarding
+        router.replace('/onboarding');
       } else {
         await signUp(email, password);
         setStatusMessage('Account created! Please check your email to verify your account.');
@@ -61,13 +63,13 @@ export default function LoginScreen() {
     }
   };
 
-  const handleSocialLogin = async (provider: 'google' | 'apple') => {
+  const handleSocialLogin = async (provider: 'google') => {
     setStatusMessage('');
     setStatusType('');
     try {
       await signInWithProvider(provider);
-      setStatusMessage('Social login successful!');
-      setStatusType('success');
+      // Skip showing success message and navigate directly to onboarding
+      router.replace('/onboarding');
     } catch (error: any) {
       setStatusMessage(error?.message || 'Social login failed.');
       setStatusType('error');

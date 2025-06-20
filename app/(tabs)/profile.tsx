@@ -12,10 +12,33 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
 import { createShadowStyle } from '@/utils/shadowStyles';
+import { setHasSeenOnboarding } from '@/utils/onboarding';
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
   const router = useRouter();
+
+  const handleReplayOnboarding = () => {
+    Alert.alert(
+      'Replay Tutorial',
+      'Would you like to view the onboarding screens again?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Replay',
+          onPress: async () => {
+            // Reset onboarding status (it will be set to true again when user completes onboarding)
+            await setHasSeenOnboarding();
+            // Navigate to onboarding
+            router.push('/onboarding');
+          },
+        },
+      ]
+    );
+  };
 
   const handleSignOut = async () => {
     Alert.alert(
@@ -78,6 +101,15 @@ export default function ProfileScreen() {
         <View style={styles.menuContainer}>
           <TouchableOpacity style={styles.menuItem}>
             <Text style={styles.menuItemText}>Settings</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.menuItem, styles.highlightedMenuItem]} 
+            onPress={handleReplayOnboarding}
+          >
+            <View style={styles.menuItemRow}>
+              <Text style={[styles.menuItemText, {color: '#FF6B6B'}]}>Replay Tutorial</Text>
+              <Text style={styles.menuItemIcon}>🔄</Text>
+            </View>
           </TouchableOpacity>
           <TouchableOpacity style={styles.menuItem}>
             <Text style={styles.menuItemText}>Help & Support</Text>
@@ -184,9 +216,21 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
   },
+  menuItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   menuItemText: {
     fontSize: 16,
     color: '#333',
+  },
+  menuItemIcon: {
+    fontSize: 16,
+    color: '#FF6B6B',
+  },
+  highlightedMenuItem: {
+    backgroundColor: 'rgba(255, 107, 107, 0.05)',
   },
   signOutButton: {
     backgroundColor: 'white',
