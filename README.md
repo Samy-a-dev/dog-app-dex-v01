@@ -1,50 +1,119 @@
-# Welcome to your Expo app 👋
+# Bingo Dog Collector App 🐕
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A React Native app built with Expo that allows users to collect and discover different dog breeds. Features authentication with Supabase and a beautiful UI inspired by modern mobile design patterns.
 
-## Get started
+## Features
 
-1. Install dependencies
+- **Splash Screen**: Beautiful animated splash screen with gradient background
+- **Authentication**: 
+  - Email/password sign up and login
+  - Social login with Google and Apple (configured via Supabase)
+  - Persistent user sessions
+- **Modern UI**: Gradient backgrounds, cards, and smooth animations
+- **Dog Collection**: Interface ready for collecting different dog breeds
+- **Profile Management**: User profile with stats and sign-out functionality
 
-   ```bash
-   npm install
-   ```
+## Setup Instructions
 
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+### 1. Install Dependencies
 
 ```bash
-npm run reset-project
+npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### 2. Configure Supabase
 
-## Learn more
+1. Create a new project at [https://supabase.com](https://supabase.com)
+2. Copy your project URL and anon key
+3. Update the `.env` file with your credentials:
 
-To learn more about developing your project with Expo, look at the following resources:
+```env
+EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+### 3. Configure Authentication Providers (Optional)
 
-## Join the community
+To enable Google and Apple sign-in:
 
-Join our community of developers creating universal apps.
+1. Go to your Supabase dashboard
+2. Navigate to Authentication > Settings
+3. Configure your OAuth providers:
+   - **Google**: Add your Google OAuth client ID
+   - **Apple**: Configure Apple sign-in
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+### 4. Start the Development Server
+
+```bash
+npx expo start
+```
+
+In the output, you'll find options to open the app in:
+- [Expo Go](https://expo.dev/go) on your mobile device
+- iOS Simulator 
+- Android Emulator
+- Web browser
+
+## Project Structure
+
+```
+app/
+├── _layout.tsx          # Root layout with AuthProvider
+├── index.tsx            # Initial routing screen
+├── auth.tsx             # Authentication screen
+└── (tabs)/              # Main app tabs
+    ├── _layout.tsx      # Tab navigation
+    ├── index.tsx        # Home/Dogs screen
+    ├── explore.tsx      # Explore screen
+    └── profile.tsx      # Profile screen
+
+components/
+├── SplashScreen.tsx     # Animated splash screen
+└── LoginScreen.tsx      # Login/signup form
+
+contexts/
+└── AuthContext.tsx      # Authentication context
+
+lib/
+└── supabase.ts          # Supabase configuration
+```
+
+## Design Features
+
+- **Gradient Backgrounds**: Beautiful orange-to-red gradients inspired by the "Bingo" brand
+- **Card-based Layout**: Modern card design with shadows and rounded corners
+- **Responsive Design**: Optimized for different screen sizes
+- **Smooth Animations**: Fade and scale animations for better UX
+
+## Authentication Flow
+
+1. **Splash Screen**: Shows for 2.5 seconds with app branding
+2. **Authentication Check**: Checks for existing user session
+3. **Login Screen**: Email/password and social login options
+4. **Main App**: Tab-based navigation with dog collection features
+5. **Profile Management**: User stats and sign-out functionality
+
+## Next Steps
+
+This app provides a solid foundation for a dog collecting game. You can extend it by:
+
+- Adding a dog API integration
+- Implementing breed discovery mechanics
+- Adding collection achievements
+- Creating a real dog database
+- Adding image recognition features
+- Implementing geolocation for dog discoveries
+
+## Technologies Used
+
+- **React Native** with **Expo**
+- **Supabase** for authentication and backend
+- **Expo Router** for navigation
+- **Linear Gradients** for beautiful UI
+- **TypeScript** for type safety
+
+## Learn More
+
+- [Expo Documentation](https://docs.expo.dev/)
+- [Supabase Documentation](https://supabase.com/docs)
+- [React Navigation](https://reactnavigation.org/)
