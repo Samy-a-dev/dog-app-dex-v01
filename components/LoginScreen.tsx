@@ -9,7 +9,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Alert,
   StatusBar,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -23,34 +22,55 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
+  const [statusType, setStatusType] = useState<'success' | 'error' | ''>('');
   const { signIn, signUp, signInWithProvider } = useAuth();
 
   const handleEmailAuth = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+      setStatusMessage('Please fill in all fields');
+      setStatusType('error');
       return;
     }
-
     setLoading(true);
+    setStatusMessage('');
+    setStatusType('');
     try {
       if (isLogin) {
         await signIn(email, password);
+        setStatusMessage('Login successful!');
+        setStatusType('success');
       } else {
         await signUp(email, password);
-        Alert.alert('Success', 'Please check your email to verify your account');
+        setStatusMessage('Account created! Please check your email to verify your account.');
+        setStatusType('success');
       }
     } catch (error: any) {
-      Alert.alert('Error', error.message);
+      let msg = error?.message || 'An error occurred. Please try again.';
+      if (msg.toLowerCase().includes('invalid login credentials')) {
+        msg = 'Invalid email or password.';
+      } else if (msg.toLowerCase().includes('email not confirmed')) {
+        msg = 'Please check your email and click the verification link before signing in.';
+      } else if (msg.toLowerCase().includes('user already registered')) {
+        msg = 'An account with this email already exists. Try signing in instead.';
+      }
+      setStatusMessage(msg);
+      setStatusType('error');
     } finally {
       setLoading(false);
     }
   };
 
   const handleSocialLogin = async (provider: 'google' | 'apple') => {
+    setStatusMessage('');
+    setStatusType('');
     try {
       await signInWithProvider(provider);
+      setStatusMessage('Social login successful!');
+      setStatusType('success');
     } catch (error: any) {
-      Alert.alert('Error', error.message);
+      setStatusMessage(error?.message || 'Social login failed.');
+      setStatusType('error');
     }
   };
 
@@ -79,6 +99,13 @@ export default function LoginScreen() {
 
           {/* Form Container */}
           <View style={styles.formContainer}>
+            {/* Status Message */}
+            {statusMessage ? (
+              <View style={[styles.statusContainer, statusType === 'success' ? styles.statusSuccess : styles.statusError]}>
+                <Text style={[styles.statusText, statusType === 'success' ? styles.statusTextSuccess : styles.statusTextError]}>{statusMessage}</Text>
+              </View>
+            ) : null}
+
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Username</Text>
               <TextInput
@@ -133,13 +160,6 @@ export default function LoginScreen() {
                 onPress={() => handleSocialLogin('google')}
               >
                 <Text style={styles.socialButtonText}>Continue with Google</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.socialButton}
-                onPress={() => handleSocialLogin('apple')}
-              >
-                <Text style={styles.socialButtonText}>Continue with Apple</Text>
               </TouchableOpacity>
             </View>
 
@@ -213,6 +233,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 32,
     paddingBottom: Platform.OS === 'ios' ? 34 : 24,
+  },
+  statusContainer: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+  },
+  statusSuccess: {
+    backgroundColor: 'rgba(76, 217, 100, 0.1)',
+  },
+  statusError: {
+    backgroundColor: 'rgba(255, 59, 48, 0.1)',
+  },
+  statusText: {
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  statusTextSuccess: {
+    color: '#4CD964',
+  },
+  statusTextError: {
+    color: '#FF3B30',
   },
   inputContainer: {
     marginBottom: 24,

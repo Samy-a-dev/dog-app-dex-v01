@@ -4,8 +4,8 @@ import { Platform } from 'react-native';
 
 // For development, you can use these placeholder values
 // Replace with your actual Supabase project credentials
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://your-project.supabase.co';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'your-anon-key-here';
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://rmntmoxestcxgikdsrpp.supabase.co';
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJtbnRtb3hlc3RjeGdpa2RzcnBwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA0MzY3OTUsImV4cCI6MjA2NjAxMjc5NX0.DClwZ_0DZQmRgvVdAuvTMoCcj_8z3i8Uy2q0BuuGWeU';
 
 // Create a safe storage adapter that works in all environments
 const createSupabaseStorage = () => {
