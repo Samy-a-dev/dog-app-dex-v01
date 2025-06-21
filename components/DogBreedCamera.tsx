@@ -461,7 +461,12 @@ If it's something else:
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+    <ScrollView 
+      style={styles.container} 
+      contentContainerStyle={styles.contentContainer}
+      showsVerticalScrollIndicator={true}
+      bounces={true}
+      alwaysBounceVertical={true}>
       {photo ? (
         <View style={styles.previewContainer}>
           <Image source={{ uri: photo }} style={styles.preview} resizeMode="contain" />
@@ -599,6 +604,8 @@ const styles = StyleSheet.create({
   contentContainer: {
     padding: 20,
     alignItems: 'center',
+    paddingBottom: 50, // Add extra padding at the bottom to ensure content is scrollable
+    flexGrow: 1, // This ensures the content container can grow beyond the screen size
   },
   headerText: {
     fontSize: 24,
