@@ -62,7 +62,12 @@ export default function DogedexScreen() {
     console.log('Dogedex: Rendering dog item. Image URL:', item.image_url, 'Breed:', item.breed_name);
     return (
       <View style={[styles.dogItem, { backgroundColor: Colors[colorScheme ?? 'light'].background, borderColor: Colors[colorScheme ?? 'light'].icon, borderWidth: colorScheme === 'dark' ? 1 : 0  }]}>
-      <Image source={{ uri: item.image_url }} style={styles.dogImage} resizeMode="cover" />
+      <Image
+        source={{ uri: item.image_url }}
+        style={[styles.dogImage, { backgroundColor: 'yellow' }]} // Temporary yellow background
+        resizeMode="cover"
+        onError={(e) => console.log('Dogedex: Image load error for', item.image_url, e.nativeEvent.error)}
+      />
       <View style={styles.dogInfo}>
         <Text style={[styles.breedName, { color: Colors[colorScheme ?? 'light'].text }]}>{item.breed_name || 'Unknown Breed'}</Text>
         <Text style={[styles.captureDate, { color: Colors[colorScheme ?? 'light'].icon }]}>
