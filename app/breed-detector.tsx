@@ -1,5 +1,7 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View, TouchableOpacity } from 'react-native';
+import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import DogBreedCamera from '../components/DogBreedCamera';
 
 export default function BreedDetectorScreen() {
@@ -8,16 +10,20 @@ export default function BreedDetectorScreen() {
     // You can add additional handling here, such as saving to history
   };
 
+  const handleGoBack = () => {
+    router.replace('/');
+  };
+
   return (
-    <View style={styles.container}>
+    <View className="flex-1 bg-black">
+      <TouchableOpacity 
+        onPress={handleGoBack}
+        className="absolute top-12 left-4 z-10 bg-[#7B4B94] rounded-full p-2"
+      >
+        <Ionicons name="arrow-back" size={24} color="white" />
+      </TouchableOpacity>
       <DogBreedCamera onBreedDetected={handleBreedDetected} />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-});
