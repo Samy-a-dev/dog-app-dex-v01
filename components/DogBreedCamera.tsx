@@ -37,6 +37,8 @@ export default function DogBreedCamera({ onBreedDetected }: Props) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSaving, setIsSaving] = useState(false); // Add saving state
   const [saveStatus, setSaveStatus] = useState<string | null>(null); // Add save status state
+  const [showSaveButton, setShowSaveButton] = useState(false); // State to control save button visibility
+  const [isSaved, setIsSaved] = useState(false); // State to track if image is saved
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [location, setLocation] = useState<LocationData | undefined>(undefined);
   const [locationPermission, setLocationPermission] = useState(false);
@@ -283,6 +285,8 @@ export default function DogBreedCamera({ onBreedDetected }: Props) {
     setLikeness(null);
     setRarity(null); // Clear previous rarity
     setSaveStatus(null); // Clear previous save status
+    setShowSaveButton(false); // Hide save button while processing
+    setIsSaved(false); // Reset saved status
 
     try {
       console.log('Initializing Gemini API...');
@@ -396,33 +400,13 @@ If it's something else:
           onBreedDetected(detectedBreed, detectedFunFact, detectedLikeness, locationData);
         }
 
-        // Save captured dog data to Supabase
-        if (user && imageUri && locationData) { // Ensure user, photo URI, and location are available
-          setIsSaving(true);
-          setSaveStatus('Saving...');
-          console.log('Attempting to save captured dog data to Supabase...');
-          const timestamp = locationData.timestamp; // Use location timestamp or current time
-          const savedDog = await saveCapturedDog(
-            user.id,
-            imageUri, // Use the photo URI for saving
-            detectedBreed,
-            detectedLikeness,
-            locationData,
-            timestamp,
-            detectedRarity // Pass rarity to save function
-          );
-
-          if (savedDog) {
-            console.log('Captured dog data saved successfully:', savedDog);
-            setSaveStatus('Saved!');
-          } else {
-            console.error('Failed to save captured dog data.');
-            setSaveStatus('Save Failed');
-          }
-          setIsSaving(false);
+        // Show save button if user is logged in and photo/location data is available, regardless of detection type
+        if (user && imageUri && locationData) {
+          console.log('User logged in and photo/location data available, showing save button.');
+          setShowSaveButton(true);
         } else {
-            console.warn('Skipping save: User not logged in, photo URI not available, or location data missing.');
-            setSaveStatus('Save Skipped (Login/Photo/Location)');
+           console.warn('Skipping save button: User not logged in, photo URI not available, or location data missing.');
+           setSaveStatus('Save Skipped (Login/Photo/Location)');
         }
 
       } catch (jsonError) {
@@ -448,16 +432,52 @@ If it's something else:
           onBreedDetected(detectedBreed, undefined, undefined, locationData);
         }
         setSaveStatus('Detection Error'); // Indicate detection error
+        setShowSaveButton(false); // Hide save button on error
       }
     } catch (error) {
       console.error('Error detecting breed:', error);
       setBreed('Error detecting breed');
       setRarity(null); // Clear rarity on error
       setSaveStatus('Detection Error'); // Indicate detection error
+      setShowSaveButton(false); // Hide save button on error
     } finally {
       console.log('Breed detection process finished.');
       setIsProcessing(false);
     }
+  };
+
+  const handleSaveImage = async () => {
+    if (!user || !photo || !location) {
+      console.warn('Cannot save: User not logged in, photo URI not available, or location data missing.');
+      setSaveStatus('Save Failed (Login/Photo/Location)');
+      return;
+    }
+
+    setIsSaving(true);
+    setSaveStatus('Saving...');
+    console.log('Attempting to save captured dog data to Supabase...');
+
+    const timestamp = location?.timestamp || Date.now(); // Use location timestamp or current time
+    const savedDog = await saveCapturedDog(
+      user.id,
+      photo, // Use the photo URI for saving
+      breed || 'Unknown Breed', // Use detected breed or default
+      likeness || 0, // Use detected likeness or default
+      location,
+      timestamp,
+      rarity || 'Unknown' // Use detected rarity or default
+    );
+
+    if (savedDog) {
+      console.log('Captured dog data saved successfully:', savedDog);
+      setSaveStatus('Saved!');
+      setIsSaved(true); // Mark as saved
+      setShowSaveButton(false); // Hide save button after saving
+    } else {
+      console.error('Failed to save captured dog data.');
+      setSaveStatus('Save Failed');
+    }
+    setIsSaving(false);
   };
 
   return (
@@ -465,6 +485,34 @@ If it's something else:
       {photo ? (
         <View style={styles.previewContainer}>
           <Image source={{ uri: photo }} style={styles.preview} resizeMode="contain" />
+
+          {/* Save Image Button */}
+          {showSaveButton && !isSaving && !isSaved && (
+            <TouchableOpacity style={styles.button} onPress={handleSaveImage}>
+              <Text style={styles.buttonText}>Save Image</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Saving Status Text */}
+          {isSaving && <Text style={styles.saveStatusText}>Saving...</Text>}
+          {saveStatus && !isSaving && <Text style={styles.saveStatusText}>{saveStatus}</Text>}
+
+          {/* Take Another Photo Button */}
+          <TouchableOpacity style={styles.button} onPress={() => {
+            setPhoto(null);
+            setBreed(null);
+            setFunFact(null);
+            setLikeness(null);
+            setRarity(null); // Clear rarity on reset
+            setDogStats(null);
+            setLocation(undefined);
+            setSaveStatus(null); // Clear save status on reset
+            setShowSaveButton(false); // Hide save button on reset
+            setIsSaved(false); // Reset saved status on reset
+          }}>
+            <Text style={styles.buttonText}>Take Another Photo</Text>
+          </TouchableOpacity>
+
           {isProcessing ? (
             <Text style={styles.breedText}>Detecting breed...</Text>
           ) : breed ? (
@@ -520,20 +568,6 @@ If it's something else:
                   )}
                 </View>
               )}
-              {isSaving && <Text style={styles.saveStatusText}>Saving...</Text>}
-              {saveStatus && !isSaving && <Text style={styles.saveStatusText}>{saveStatus}</Text>}
-              <TouchableOpacity style={styles.button} onPress={() => {
-                setPhoto(null);
-                setBreed(null);
-                setFunFact(null);
-                setLikeness(null);
-                setRarity(null); // Clear rarity on reset
-                setDogStats(null);
-                setLocation(undefined);
-                setSaveStatus(null); // Clear save status on reset
-              }}>
-                <Text style={styles.buttonText}>Take Another Photo</Text>
-              </TouchableOpacity>
             </>
           ) : null}
         </View>
