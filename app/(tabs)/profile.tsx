@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,35 +10,69 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
-import { clearHasSeenOnboarding } from '@/utils/onboarding';
+import { supabase } from '@/lib/supabase'; // Import supabase
+import { setHasSeenOnboarding } from '@/utils/onboarding';
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
   const router = useRouter();
-  const [isSigningOut, setIsSigningOut] = useState(false);
+  const [totalXp, setTotalXp] = useState<number | null>(null);
+  const [loadingXp, setLoadingXp] = useState(true);
 
   useEffect(() => {
-    // This effect should strictly handle redirection after sign-out.
-    if (!user && isSigningOut) {
-      router.replace('/auth');
-    }
-  }, [user, isSigningOut, router]);
+    const fetchUserXp = async () => {
+      console.log('[XP DEBUG] ProfileScreen: fetchUserXp called.');
+      if (user) {
+        console.log(`[XP DEBUG] ProfileScreen: User found (ID: ${user.id}). Fetching XP.`);
+        setLoadingXp(true);
+        try {
+          const { data, error, status } = await supabase
+            .from('user_profiles')
+            .select('total_xp')
+            .eq('user_id', user.id)
+            .single();
 
-  const handleReplayOnboarding = async () => {
-    try {
-      console.log("Clearing onboarding status...");
-      await clearHasSeenOnboarding();
-      console.log("Onboarding status cleared successfully");
-      console.log("Navigating to onboarding...");
-      router.push('/onboarding');
-      console.log("Navigation to onboarding initiated");
-    } catch (error) {
-      console.error('Error replaying onboarding:', error);
-      Alert.alert('Error', 'Could not replay the tutorial. Please try again.');
-    }
-  };
+          console.log(`[XP DEBUG] ProfileScreen: Supabase response for user_profiles. Data: ${JSON.stringify(data)}, Error: ${JSON.stringify(error)}, Status: ${status}`);
 
-  const confirmReplayOnboarding = () => {
+          if (error && error.code !== 'PGRST116') { // PGRST116: 0 rows (single row expected but not found)
+            console.error('[XP DEBUG] ProfileScreen: Error fetching user XP from Supabase:', error);
+            setTotalXp(0);
+          } else if (data) {
+            console.log(`[XP DEBUG] ProfileScreen: Successfully fetched XP: ${data.total_xp}. Setting state.`);
+            setTotalXp(data.total_xp);
+          } else {
+            // This case handles PGRST116 (no rows found) or if data is null for other reasons.
+            console.log('[XP DEBUG] ProfileScreen: No XP profile data found for user (or error PGRST116). Defaulting totalXp to 0.');
+            setTotalXp(0);
+          }
+        } catch (e) {
+          console.error('[XP DEBUG] ProfileScreen: Exception during fetchUserXp:', e);
+          setTotalXp(0);
+        } finally {
+          console.log('[XP DEBUG] ProfileScreen: Finished fetchUserXp try-catch block. Setting loadingXp to false.');
+          setLoadingXp(false);
+        }
+      } else {
+        console.log('[XP DEBUG] ProfileScreen: No user found. Setting totalXp to null and loadingXp to false.');
+        setTotalXp(null); // No user, no XP
+        setLoadingXp(false);
+      }
+    };
+
+    fetchUserXp();
+    // Consider adding a listener for Supabase real-time updates on user_profiles if needed.
+    // For example, if XP can be updated from other parts of the app or backend processes.
+    // const channel = supabase.channel(`user-profile-${user?.id}`)
+    //   .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'user_profiles', filter: `user_id=eq.${user?.id}` }, payload => {
+    //     setTotalXp((payload.new as { total_xp: number }).total_xp);
+    //   })
+    //   .subscribe();
+    // return () => {
+    //   supabase.removeChannel(channel);
+    // };
+  }, [user]);
+
+  const handleReplayOnboarding = () => {
     Alert.alert(
       'Replay Tutorial',
       'Are you sure you want to view the onboarding screens again?',
@@ -109,6 +143,10 @@ export default function ProfileScreen() {
           <View style={styles.stat}>
             <Text style={styles.statNumber}>0</Text>
             <Text style={styles.statLabel}>Achievements</Text>
+          </View>
+          <View style={styles.stat}>
+            <Text style={styles.statNumber}>{loadingXp ? '...' : totalXp ?? 0}</Text>
+            <Text style={styles.statLabel}>Total XP</Text>
           </View>
         </View>
 

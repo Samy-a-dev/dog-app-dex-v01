@@ -196,3 +196,33 @@ export async function getCapturedDogs(userId: string) {
     return [];
   }
 }
+
+export async function awardXpForNewBreed(
+  userId: string,
+  breedName: string,
+  rarity: string
+): Promise<{ awardedXp: number; error: any }> {
+  try {
+    console.log(`[XP DEBUG] lib/supabase: Calling RPC 'award_xp_rpc' with User ID: ${userId}, Breed: ${breedName}, Rarity: ${rarity}`);
+    const { data, error } = await supabase.rpc('award_xp_rpc', {
+      p_user_id: userId,
+      p_breed_name: breedName,
+      p_rarity: rarity,
+    });
+    console.log(`[XP DEBUG] lib/supabase: RPC 'award_xp_rpc' call returned. Data: ${data}, Error: ${JSON.stringify(error)}`);
+
+    if (error) {
+      console.error('[XP DEBUG] lib/supabase: Error received from RPC call:', error);
+      return { awardedXp: 0, error };
+    }
+    
+    const xp = data === -1 ? 0 : (data || 0); // If RPC returned -1 (internal error), treat as 0 XP awarded for client, but retain error.
+    const rpcErrorObject = data === -1 ? { message: 'RPC Error: Internal function error in award_xp_rpc.' } : null;
+    
+    console.log(`[XP DEBUG] lib/supabase: Processed RPC response. Calculated XP: ${xp}, RPC Error Object: ${JSON.stringify(rpcErrorObject)}`);
+    return { awardedXp: xp, error: rpcErrorObject || error }; // Prioritize RPC error object if -1 was returned.
+  } catch (rpcCatchError) {
+    console.error('[XP DEBUG] lib/supabase: Exception caught calling awardXpForNewBreed RPC:', rpcCatchError);
+    return { awardedXp: 0, error: rpcCatchError };
+  }
+}
