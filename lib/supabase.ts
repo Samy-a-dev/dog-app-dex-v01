@@ -81,15 +81,17 @@ export async function saveCapturedDog(
 ) {
   try {
     // Determine file extension and create a unique file name
-    const fileExtension = imageUri.split('.').pop() || 'jpg';
-    const fileName = `${userId}/${Date.now()}.${fileExtension}`; // Unique path in storage
-
+    let fileExtension: string;
+    let fileName: string;
     let fileBody: Blob | string;
+    let mimeType: string = 'image/jpeg'; // Default MIME type
 
     if (Platform.OS === 'web' && imageUri.startsWith('data:')) {
         // Handle data URI on web
         const mimeMatch = imageUri.match(/^data:(.*?);base64,/);
-        const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+        mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+        fileExtension = mimeType.split('/')[1] || 'jpg'; // Extract extension from mimeType
+
         const byteCharacters = atob(imageUri.split(',')[1]);
         const byteNumbers = new Array(byteCharacters.length);
         for (let i = 0; i < byteCharacters.length; i++) {
@@ -100,14 +102,20 @@ export async function saveCapturedDog(
 
     } else if (imageUri.startsWith('file://')) {
         // Handle file URI on native
+        fileExtension = imageUri.split('.').pop() || 'jpg';
         // Fetch the blob directly from the URI
         const response = await fetch(imageUri);
         fileBody = await response.blob();
+        // Try to get mimeType from blob, or infer from extension
+        mimeType = fileBody.type || `image/${fileExtension}`;
 
     } else {
         // Handle other potential URI types or errors
         throw new Error(`Unsupported image URI format: ${imageUri}`);
     }
+    
+    fileName = `${userId}/${Date.now()}.${fileExtension}`; // Unique path in storage
+    console.log(`Supabase upload details: FileName: [${fileName}], MimeType: [${mimeType}], FileBody type: [${typeof fileBody}]`);
 
     // Upload the image to Supabase Storage
     const { data: uploadData, error: uploadError } = await supabase.storage
@@ -115,6 +123,7 @@ export async function saveCapturedDog(
         .upload(fileName, fileBody, {
             cacheControl: '3600',
             upsert: false, // Set to true if you want to overwrite existing files with the same name
+            contentType: mimeType, // Explicitly set content type
         });
 
     if (uploadError) {

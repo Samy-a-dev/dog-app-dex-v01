@@ -447,6 +447,7 @@ If it's something else:
   };
 
   const handleSaveImage = async () => {
+    console.log('handleSaveImage called'); // Added log
     if (!user || !photo || !location) {
       console.warn('Cannot save: User not logged in, photo URI not available, or location data missing.');
       setSaveStatus('Save Failed (Login/Photo/Location)');
@@ -456,8 +457,17 @@ If it's something else:
     setIsSaving(true);
     setSaveStatus('Saving...');
     console.log('Attempting to save captured dog data to Supabase...');
+    console.log('User ID:', user.id); // Added log
+    console.log('Photo URI:', photo); // Added log
+    console.log('Location Data:', location); // Added log
+    console.log('Detected Breed:', breed); // Added log
+    console.log('Detected Likeness:', likeness); // Added log
+    console.log('Detected Rarity:', rarity); // Added log
+
 
     const timestamp = location?.timestamp || Date.now(); // Use location timestamp or current time
+    console.log('Using timestamp:', new Date(timestamp).toISOString()); // Added log
+
     const savedDog = await saveCapturedDog(
       user.id,
       photo, // Use the photo URI for saving
@@ -478,6 +488,7 @@ If it's something else:
       setSaveStatus('Save Failed');
     }
     setIsSaving(false);
+    console.log('handleSaveImage finished'); // Added log
   };
 
   return (
