@@ -10,14 +10,15 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
-import { supabase } from '@/lib/supabase'; // Import supabase
-import { setHasSeenOnboarding } from '@/utils/onboarding';
+import { supabase } from '@/lib/supabase';
+import { setHasSeenOnboarding, clearHasSeenOnboarding } from '@/utils/onboarding';
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
   const router = useRouter();
   const [totalXp, setTotalXp] = useState<number | null>(null);
   const [loadingXp, setLoadingXp] = useState(true);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   useEffect(() => {
     const fetchUserXp = async () => {
@@ -72,7 +73,17 @@ export default function ProfileScreen() {
     // };
   }, [user]);
 
-  const handleReplayOnboarding = () => {
+  const handleReplayOnboarding = async () => {
+    try {
+      await clearHasSeenOnboarding();
+      router.replace('/onboarding');
+    } catch (error) {
+      console.error('Error clearing onboarding state:', error);
+      Alert.alert('Error', 'Failed to replay tutorial. Please try again.');
+    }
+  };
+
+  const confirmReplayOnboarding = () => {
     Alert.alert(
       'Replay Tutorial',
       'Are you sure you want to view the onboarding screens again?',

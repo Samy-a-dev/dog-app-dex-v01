@@ -8,6 +8,10 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "build": "expo export -p web",
+    "build:web": "expo export -p web",
+    "serve": "npx serve dist",
+    "deploy": "vercel --prod",
     "lint": "expo lint"
   },
   "dependencies": {
@@ -53,9 +57,11 @@
     "@babel/core": "^7.25.2",
     "@types/node": "^24.0.3",
     "@types/react": "~19.0.10",
+    "@vercel/node": "^5.3.0",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~9.2.0",
     "expo-module-scripts": "^4.1.7",
+    "serve": "^14.2.4",
     "tailwindcss": "^3.3.2",
     "typescript": "~5.8.3"
   },
