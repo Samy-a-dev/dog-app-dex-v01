@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { StyleSheet, View, TouchableOpacity, Text, Image, Platform, ScrollView } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, Text, Image, Platform, ScrollView, Animated } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import * as Location from 'expo-location';
 import { useAuth } from '@/contexts/AuthContext';
-import { saveCapturedDog } from '@/lib/supabase';
+import { saveCapturedDog, awardXpForNewBreed } from '@/lib/supabase';
 
 interface LocationData {
   latitude: number;
@@ -45,6 +45,12 @@ export default function DogBreedCamera({ onBreedDetected }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
+  // State and Refs for XP Animation
+  const [xpGainedAnimValue, setXpGainedAnimValue] = useState<number | null>(null);
+  const xpAnimOpacity = useRef(new Animated.Value(0)).current;
+  const xpAnimTranslateY = useRef(new Animated.Value(0)).current;
+  const [duplicateCaptureMessage, setDuplicateCaptureMessage] = useState<string | null>(null);
 
   // Clean up camera stream when component unmounts
   useEffect(() => {
@@ -446,6 +452,35 @@ If it's something else:
     }
   };
 
+  const triggerXpAnimation = (xpValue: number) => {
+    setXpGainedAnimValue(xpValue);
+    xpAnimOpacity.setValue(0);
+    xpAnimTranslateY.setValue(20); // Start slightly lower
+
+    Animated.sequence([
+      Animated.parallel([
+        Animated.timing(xpAnimOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(xpAnimTranslateY, {
+          toValue: 0, // Float up to original position (or slightly above if initial was 0 and this is -20)
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.delay(1500),
+      Animated.timing(xpAnimOpacity, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setXpGainedAnimValue(null); // Reset after animation
+    });
+  };
+
   const handleSaveImage = async () => {
     console.log('handleSaveImage called'); // Added log
     if (!user || !photo || !location) {
@@ -483,6 +518,38 @@ If it's something else:
       setSaveStatus('Saved!');
       setIsSaved(true); // Mark as saved
       setShowSaveButton(false); // Hide save button after saving
+
+      // Attempt to award XP
+      if (breed && rarity && user) { // Ensure breed, rarity, and user are available
+        console.log(`[XP DEBUG] DogBreedCamera: Preparing to award XP. User ID: ${user.id}, Breed: ${breed}, Rarity: ${rarity}`);
+        const { awardedXp, error: xpError } = await awardXpForNewBreed(user.id, breed, rarity);
+        console.log(`[XP DEBUG] DogBreedCamera: awardXpForNewBreed call completed. Awarded XP: ${awardedXp}, Error: ${JSON.stringify(xpError)}`);
+
+        setDuplicateCaptureMessage(null); // Clear previous duplicate message first
+        if (xpError) {
+          console.error('[XP DEBUG] DogBreedCamera: Failed to award XP. Error details:', xpError);
+          // Optionally set a generic error message to display to the user
+        } else if (awardedXp > 0) {
+          console.log(`[XP DEBUG] DogBreedCamera: Successfully awarded ${awardedXp} XP for capturing ${breed}!`);
+          triggerXpAnimation(awardedXp);
+        } else { // awardedXp is 0
+          // Check if it was specifically a duplicate (RPC returned 0, and no separate xpError was flagged by our client wrapper)
+          // Our client-side awardXpForNewBreed maps RPC's -1 to awardedXp:0 AND an error object.
+          // So, if awardedXp is 0 AND xpError is null, it means the RPC genuinely returned 0 (duplicate).
+          if (xpError === null && breed) { // Ensure breed is not null for the message
+             console.log(`[XP DEBUG] DogBreedCamera: Duplicate capture detected for ${breed}.`);
+             setDuplicateCaptureMessage(`You've already captured a ${breed}!`);
+             setTimeout(() => setDuplicateCaptureMessage(null), 3500); // Clear after 3.5 seconds
+          } else {
+            // This case means awardedXp is 0 due to an RPC internal error that was mapped, or another non-duplicate scenario.
+            console.log(`[XP DEBUG] DogBreedCamera: No XP awarded. Error: ${JSON.stringify(xpError)} (This could be an RPC internal error, or 0 XP for rarity if applicable).`);
+            // Optionally set a generic info/error message if appropriate
+          }
+        }
+      } else {
+        console.warn(`[XP DEBUG] DogBreedCamera: Skipping XP award. Missing data: breed=${breed}, rarity=${rarity}, user=${!!user}`);
+      }
+
     } else {
       console.error('Failed to save captured dog data.');
       setSaveStatus('Save Failed');
@@ -496,6 +563,30 @@ If it's something else:
       {photo ? (
         <View style={styles.previewContainer}>
           <Image source={{ uri: photo }} style={styles.preview} resizeMode="contain" />
+
+          {/* XP Gained Animation */}
+          {xpGainedAnimValue !== null && (
+            <Animated.View
+              style={[
+                styles.xpAnimationContainer,
+                {
+                  opacity: xpAnimOpacity,
+                  transform: [{ translateY: xpAnimTranslateY }],
+                },
+              ]}
+            >
+              <Text style={styles.xpAnimationText}>
+                +{xpGainedAnimValue} XP!
+              </Text>
+            </Animated.View>
+          )}
+
+          {/* Duplicate Capture Message */}
+          {duplicateCaptureMessage && (
+            <View style={styles.notificationMessageContainer}>
+              <Text style={styles.notificationMessageText}>{duplicateCaptureMessage}</Text>
+            </View>
+          )}
 
           {/* Save Image Button */}
           {showSaveButton && !isSaving && !isSaved && (
@@ -784,5 +875,42 @@ const styles = StyleSheet.create({
     marginTop: 20,
     textAlign: 'center',
     color: '#555',
+  },
+  xpAnimationContainer: {
+    position: 'absolute',
+    alignSelf: 'center',
+    top: '30%', // Adjust this value to position the animation appropriately
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    borderRadius: 20,
+    zIndex: 1000, // Ensure it's on top of other elements
+  },
+  xpAnimationText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  notificationMessageContainer: {
+    position: 'absolute',
+    alignSelf: 'center',
+    top: '35%', // Adjust as needed
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255, 165, 0, 0.85)', // Orange-ish background
+    borderRadius: 8,
+    zIndex: 999, // Ensure it's visible
+    elevation: 5, // For Android shadow
+    shadowColor: '#000', // For iOS shadow
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+  },
+  notificationMessageText: {
+    color: '#000000',
+    fontSize: 15,
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
 });
