@@ -12,11 +12,22 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { createShadowStyle } from '@/utils/shadowStyles';
+import { useRouter } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen() {
   const { user } = useAuth();
+  const router = useRouter();
+
+  const handleLeaderboardPress = () => {
+    try {
+      console.log('Navigating to leaderboard...');
+      router.push('/leaderboard');
+    } catch (error) {
+      console.error('Navigation error:', error);
+    }
+  };
 
   const dogBreeds = [
     { id: 1, name: 'Golden Retriever', emoji: '🦮', collected: false },
@@ -33,9 +44,27 @@ export default function HomeScreen() {
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       >
-        <View style={styles.headerContent}>
-          <Text style={styles.greeting}>Hello, Dog Lover! 🐕</Text>
-          <Text style={styles.subtitle}>Ready to collect some amazing dogs?</Text>
+        <View style={styles.headerWithButton}>
+          <View style={styles.headerContent}>
+            <Text style={styles.greeting}>
+              Hello, {user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Dog Lover'}! 🐕
+            </Text>
+            <Text style={styles.subtitle}>Ready to collect some amazing dogs?</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.leaderboardButton}
+            onPress={handleLeaderboardPress}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={['rgba(255, 255, 255, 0.9)', 'rgba(255, 255, 255, 0.7)']}
+              style={styles.leaderboardButtonGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <Text style={styles.leaderboardButtonText}>🏆</Text>
+            </LinearGradient>
+          </TouchableOpacity>
         </View>
       </LinearGradient>
 
@@ -107,7 +136,13 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
     paddingHorizontal: 20,
   },
+  headerWithButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   headerContent: {
+    flex: 1,
     alignItems: 'center',
   },
   greeting: {
@@ -255,5 +290,28 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  leaderboardButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    overflow: 'hidden',
+    marginLeft: 16,
+    ...createShadowStyle({
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+      elevation: 5,
+    }),
+  },
+  leaderboardButtonGradient: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  leaderboardButtonText: {
+    fontSize: 24,
   },
 });

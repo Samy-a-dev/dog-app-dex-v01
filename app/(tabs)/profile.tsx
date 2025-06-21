@@ -136,7 +136,9 @@ export default function ProfileScreen() {
           <View style={styles.avatarContainer}>
             <Text style={styles.avatarText}>🐕</Text>
           </View>
-          <Text style={styles.userName}>{user?.email}</Text>
+          <Text style={styles.userName}>
+            {user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Dog Lover'}
+          </Text>
           <Text style={styles.userTitle}>Dog Collector</Text>
         </View>
       </LinearGradient>
