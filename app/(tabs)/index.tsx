@@ -141,13 +141,6 @@ const router = useRouter();
           )}
         </View>
 
-        <TouchableOpacity style={styles.exploreButton}>
-          <View
-            style={styles.exploreButtonGradient}
-          >
-            <Text style={styles.exploreButtonText}>Start Exploring</Text>
-          </View>
-        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -203,21 +196,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 16,
-  },
-  exploreButton: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginBottom: 30,
-  },
-  exploreButtonGradient: {
-    paddingVertical: 16,
-    alignItems: 'center',
-    backgroundColor: '#FF6B6B',
-  },
-  exploreButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
   },
 exploreBreedsContainer: {
     marginTop: 20,
