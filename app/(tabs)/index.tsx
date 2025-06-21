@@ -33,6 +33,7 @@ interface Breed {
 import { useAuth } from '@/contexts/AuthContext';
 import { createShadowStyle } from '@/utils/shadowStyles';
 import XPDisplayCard from '@/components/XPDisplayCard'; // Added import
+import { IconSymbol } from '@/components/ui/IconSymbol'; // Added import
 
 const { width } = Dimensions.get('window');
 
@@ -175,6 +176,26 @@ export default function HomeScreen() {
         </View>
 
       </ScrollView>
+      
+      {/* Floating Camera Button */}
+      <TouchableOpacity 
+        style={styles.floatingCameraButton}
+        onPress={() => router.push('/camera')}
+        activeOpacity={0.8}
+      >
+        <LinearGradient
+          colors={['#8B5CF6', '#A855F7']}
+          style={styles.floatingCameraButtonGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <IconSymbol 
+            name="camera.fill" 
+            size={28} 
+            color="white" 
+          />
+        </LinearGradient>
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -353,5 +374,27 @@ exploreBreedCardTouchable: {
   },
   leaderboardButtonText: {
     fontSize: 24,
+  },
+  floatingCameraButton: {
+    position: 'absolute',
+    bottom: 90, // Position above the tab bar
+    right: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    overflow: 'hidden',
+    ...createShadowStyle({
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 8,
+    }),
+  },
+  floatingCameraButtonGradient: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
