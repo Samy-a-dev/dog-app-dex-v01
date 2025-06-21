@@ -3,6 +3,8 @@ import { StyleSheet, View, TouchableOpacity, Text, Image, Platform, ScrollView }
 import * as ImagePicker from 'expo-image-picker';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import * as Location from 'expo-location';
+import { useAuth } from '@/contexts/AuthContext';
+import { saveCapturedDog } from '@/lib/supabase';
 
 interface LocationData {
   latitude: number;
@@ -25,19 +27,25 @@ interface Props {
 }
 
 export default function DogBreedCamera({ onBreedDetected }: Props) {
+  const { user } = useAuth(); // Get the authenticated user
   const [photo, setPhoto] = useState<string | null>(null);
   const [breed, setBreed] = useState<string | null>(null);
   const [funFact, setFunFact] = useState<string | null>(null);
   const [likeness, setLikeness] = useState<number | null>(null);
+  const [rarity, setRarity] = useState<string | null>(null); // Add rarity state
   const [dogStats, setDogStats] = useState<DogStats | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false); // Add saving state
+  const [saveStatus, setSaveStatus] = useState<string | null>(null); // Add save status state
+  const [showSaveButton, setShowSaveButton] = useState(false); // State to control save button visibility
+  const [isSaved, setIsSaved] = useState(false); // State to track if image is saved
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [location, setLocation] = useState<LocationData | undefined>(undefined);
   const [locationPermission, setLocationPermission] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  
+
   // Clean up camera stream when component unmounts
   useEffect(() => {
     // Request location permissions when component mounts
@@ -50,26 +58,26 @@ export default function DogBreedCamera({ onBreedDetected }: Props) {
         console.log('Location permission granted');
       }
     })();
-    
+
     return () => {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
     };
   }, []);
-  
+
   // Function to get current location
   const getCurrentLocation = async (): Promise<LocationData | undefined> => {
     if (!locationPermission) {
       console.log('Location permission not granted');
       return undefined;
     }
-    
+
     try {
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High
       });
-      
+
       return {
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
@@ -92,11 +100,11 @@ export default function DogBreedCamera({ onBreedDetected }: Props) {
           video: { facingMode: 'environment' },
           audio: false
         });
-        
+
         console.log('Web camera stream obtained successfully.');
         streamRef.current = stream;
         setIsCameraOpen(true);
-        
+
         // Wait for DOM to update
         setTimeout(() => {
           if (videoRef.current) {
@@ -123,12 +131,12 @@ export default function DogBreedCamera({ onBreedDetected }: Props) {
 
 
         console.log('Launching native camera...');
-        
+
         // Get current location before taking the photo
         const currentLocation = await getCurrentLocation();
         setLocation(currentLocation);
         console.log('Current location:', currentLocation);
-        
+
         // Launch camera on native
         const result = await ImagePicker.launchCameraAsync({
           mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -145,7 +153,7 @@ export default function DogBreedCamera({ onBreedDetected }: Props) {
           const asset = result.assets[0];
           setPhoto(asset.uri);
           if (asset.base64) {
-            await detectBreed(asset.base64, currentLocation);
+            await detectBreed(asset.base64, currentLocation, asset.uri); // Pass image URI
           }
         }
       } catch (error) {
@@ -154,7 +162,7 @@ export default function DogBreedCamera({ onBreedDetected }: Props) {
       }
     }
   };
-  
+
   const takePicture = async () => {
     if (Platform.OS === 'web' && isCameraOpen) {
 
@@ -164,30 +172,30 @@ export default function DogBreedCamera({ onBreedDetected }: Props) {
         const currentLocation = await getCurrentLocation();
         setLocation(currentLocation);
         console.log('Current location:', currentLocation);
-        
+
         // Capture image from video stream
         if (videoRef.current && canvasRef.current) {
           console.log('Video and canvas refs are available.');
           const video = videoRef.current;
           const canvas = canvasRef.current;
-          
+
           // Set canvas dimensions to match video
           canvas.width = video.videoWidth;
           canvas.height = video.videoHeight;
           console.log(`Canvas dimensions set to ${canvas.width}x${canvas.height}`);
-          
+
           // Draw video frame to canvas
           const ctx = canvas.getContext('2d');
           if (ctx) {
             console.log('Canvas context obtained.');
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             console.log('Video frame drawn to canvas.');
-            
+
             // Convert canvas to base64 image
             const base64Image = canvas.toDataURL('image/jpeg').split(',')[1];
             const imageUri = canvas.toDataURL('image/jpeg');
             console.log('Image captured and converted to base64 and URI.');
-            
+
             // Stop camera stream
             if (streamRef.current) {
               console.log('Stopping camera stream.');
@@ -195,12 +203,12 @@ export default function DogBreedCamera({ onBreedDetected }: Props) {
             }
             setIsCameraOpen(false);
             console.log('Camera closed.');
-            
+
             // Process the image
             setPhoto(imageUri);
             console.log('Photo state updated.');
-            await detectBreed(base64Image, currentLocation);
-            console.log('detectBreed called with base64 image and location.');
+            await detectBreed(base64Image, currentLocation, imageUri); // Pass image URI
+            console.log('detectBreed called with base64 image, location, and image URI.');
           } else {
             console.log('Could not get canvas 2D context.');
           }
@@ -260,7 +268,7 @@ export default function DogBreedCamera({ onBreedDetected }: Props) {
         const asset = result.assets[0];
         setPhoto(asset.uri);
         if (asset.base64) {
-          await detectBreed(asset.base64, currentLocation);
+          await detectBreed(asset.base64, currentLocation, asset.uri); // Pass image URI
         }
       }
     } catch (error) {
@@ -269,17 +277,21 @@ export default function DogBreedCamera({ onBreedDetected }: Props) {
     }
   };
 
-  const detectBreed = async (base64Image: string, locationData?: LocationData) => {
+  const detectBreed = async (base64Image: string, locationData?: LocationData, imageUri?: string) => {
 
     console.log('Starting breed detection...');
     setIsProcessing(true);
     setFunFact(null);
     setLikeness(null);
-    
+    setRarity(null); // Clear previous rarity
+    setSaveStatus(null); // Clear previous save status
+    setShowSaveButton(false); // Hide save button while processing
+    setIsSaved(false); // Reset saved status
+
     try {
       console.log('Initializing Gemini API...');
       // Initialize Gemini API with your API key
-      const apiKey = process.env.EXPO_GEMINI_API_KEY;
+      const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
       if (!apiKey) {
         throw new Error('Gemini API key is not set in environment variables.');
       }
@@ -292,7 +304,8 @@ export default function DogBreedCamera({ onBreedDetected }: Props) {
   "type": "dog" or "human" or "other",
   "identification": breed name if dog, or description if other,
   "likeness": confidence score from 0-100,
-  "funFact": an interesting fact about the breed or subject
+  "funFact": an interesting fact about the breed or subject,
+  "rarity": "Common" or "Uncommon" or "Rare" or "Super Rare" (only if type is "dog")
 }
 
 For example, if it's a Golden Retriever dog:
@@ -300,7 +313,8 @@ For example, if it's a Golden Retriever dog:
   "type": "dog",
   "identification": "Golden Retriever",
   "likeness": 95,
-  "funFact": "Golden Retrievers were originally bred in Scotland in the mid-19th century as hunting dogs to retrieve waterfowl."
+  "funFact": "Golden Retrievers were originally bred in Scotland in the mid-19th century as hunting dogs to retrieve waterfowl.",
+  "rarity": "Common"
 }
 
 If it's a human:
@@ -318,7 +332,7 @@ If it's something else:
   "likeness": 90,
   "funFact": "Cats spend about 70% of their lives sleeping."
 }`;
-      
+
 
       console.log('Sending image to Gemini API...');
       const result = await model.generateContent([
@@ -356,18 +370,21 @@ If it's something else:
         let detectedBreed: string;
         let detectedFunFact: string = detectionResult.funFact || '';
         let detectedLikeness: number = detectionResult.likeness || 0;
-        
+        let detectedRarity: string = 'Unknown'; // Default rarity
+
         if (detectionResult.type === 'dog') {
           detectedBreed = detectionResult.identification;
+          detectedRarity = detectionResult.rarity || 'Unknown'; // Extract rarity
         } else if (detectionResult.type === 'human') {
           detectedBreed = 'Human detected - not a dog';
         } else {
           detectedBreed = `Not a dog: ${detectionResult.identification}`;
         }
-        
+
         setBreed(detectedBreed);
         setFunFact(detectedFunFact);
         setLikeness(detectedLikeness);
+        setRarity(detectedRarity); // Set rarity state
         // Add default stats
         setDogStats({
           intelligenceRanking: "#4 out of 138 (very trainable)",
@@ -376,19 +393,29 @@ If it's something else:
           droolingTendency: "Low",
           barkingLevel: "Moderate"
         });
-        console.log(`Detected: Type=${detectionResult.type}, ID=${detectedBreed}, Likeness=${detectedLikeness}, FunFact=${detectedFunFact}`);
-        
+        console.log(`Detected: Type=${detectionResult.type}, ID=${detectedBreed}, Likeness=${detectedLikeness}, FunFact=${detectedFunFact}, Rarity=${detectedRarity}`);
+
         if (onBreedDetected) {
           console.log('Calling onBreedDetected callback with location:', locationData);
           onBreedDetected(detectedBreed, detectedFunFact, detectedLikeness, locationData);
         }
+
+        // Show save button if user is logged in and photo/location data is available, regardless of detection type
+        if (user && imageUri && locationData) {
+          console.log('User logged in and photo/location data available, showing save button.');
+          setShowSaveButton(true);
+        } else {
+           console.warn('Skipping save button: User not logged in, photo URI not available, or location data missing.');
+           setSaveStatus('Save Skipped (Login/Photo/Location)');
+        }
+
       } catch (jsonError) {
         // Fallback if JSON parsing fails
         console.error('Error parsing JSON response:', jsonError);
-        
+
         // Try to extract information from text response
         let detectedBreed: string;
-        
+
         if (detectionResultText.toLowerCase().includes('dog')) {
           detectedBreed = 'Dog (unable to identify specific breed)';
         } else if (detectionResultText.toLowerCase().includes('human')) {
@@ -396,21 +423,72 @@ If it's something else:
         } else {
           detectedBreed = 'Unable to identify subject';
         }
-        
+
         setBreed(detectedBreed);
+        setRarity(null); // Clear rarity on fallback
         console.log('JSON parsing failed, falling back to text analysis. Detected breed:', detectedBreed);
         if (onBreedDetected) {
           console.log('Calling onBreedDetected callback (fallback) with location:', locationData);
           onBreedDetected(detectedBreed, undefined, undefined, locationData);
         }
+        setSaveStatus('Detection Error'); // Indicate detection error
+        setShowSaveButton(false); // Hide save button on error
       }
     } catch (error) {
       console.error('Error detecting breed:', error);
       setBreed('Error detecting breed');
+      setRarity(null); // Clear rarity on error
+      setSaveStatus('Detection Error'); // Indicate detection error
+      setShowSaveButton(false); // Hide save button on error
     } finally {
       console.log('Breed detection process finished.');
       setIsProcessing(false);
     }
+  };
+
+  const handleSaveImage = async () => {
+    console.log('handleSaveImage called'); // Added log
+    if (!user || !photo || !location) {
+      console.warn('Cannot save: User not logged in, photo URI not available, or location data missing.');
+      setSaveStatus('Save Failed (Login/Photo/Location)');
+      return;
+    }
+
+    setIsSaving(true);
+    setSaveStatus('Saving...');
+    console.log('Attempting to save captured dog data to Supabase...');
+    console.log('User ID:', user.id); // Added log
+    console.log('Photo URI:', photo); // Added log
+    console.log('Location Data:', location); // Added log
+    console.log('Detected Breed:', breed); // Added log
+    console.log('Detected Likeness:', likeness); // Added log
+    console.log('Detected Rarity:', rarity); // Added log
+
+
+    const timestamp = location?.timestamp || Date.now(); // Use location timestamp or current time
+    console.log('Using timestamp:', new Date(timestamp).toISOString()); // Added log
+
+    const savedDog = await saveCapturedDog(
+      user.id,
+      photo, // Use the photo URI for saving
+      breed || 'Unknown Breed', // Use detected breed or default
+      likeness || 0, // Use detected likeness or default
+      location,
+      timestamp,
+      rarity || 'Unknown' // Use detected rarity or default
+    );
+
+    if (savedDog) {
+      console.log('Captured dog data saved successfully:', savedDog);
+      setSaveStatus('Saved!');
+      setIsSaved(true); // Mark as saved
+      setShowSaveButton(false); // Hide save button after saving
+    } else {
+      console.error('Failed to save captured dog data.');
+      setSaveStatus('Save Failed');
+    }
+    setIsSaving(false);
+    console.log('handleSaveImage finished'); // Added log
   };
 
   return (
@@ -418,11 +496,42 @@ If it's something else:
       {photo ? (
         <View style={styles.previewContainer}>
           <Image source={{ uri: photo }} style={styles.preview} resizeMode="contain" />
+
+          {/* Save Image Button */}
+          {showSaveButton && !isSaving && !isSaved && (
+            <TouchableOpacity style={styles.button} onPress={handleSaveImage}>
+              <Text style={styles.buttonText}>Save Image</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Saving Status Text */}
+          {isSaving && <Text style={styles.saveStatusText}>Saving...</Text>}
+          {saveStatus && !isSaving && <Text style={styles.saveStatusText}>{saveStatus}</Text>}
+
+          {/* Take Another Photo Button */}
+          <TouchableOpacity style={styles.button} onPress={() => {
+            setPhoto(null);
+            setBreed(null);
+            setFunFact(null);
+            setLikeness(null);
+            setRarity(null); // Clear rarity on reset
+            setDogStats(null);
+            setLocation(undefined);
+            setSaveStatus(null); // Clear save status on reset
+            setShowSaveButton(false); // Hide save button on reset
+            setIsSaved(false); // Reset saved status on reset
+          }}>
+            <Text style={styles.buttonText}>Take Another Photo</Text>
+          </TouchableOpacity>
+
           {isProcessing ? (
             <Text style={styles.breedText}>Detecting breed...</Text>
           ) : breed ? (
             <>
               <Text style={styles.breedText}>{breed}</Text>
+              {rarity && ( // Display rarity
+                <Text style={styles.rarityText}>Rarity: {rarity}</Text>
+              )}
               {likeness !== null && (
                 <Text style={styles.likenessText}>Confidence: {likeness}%</Text>
               )}
@@ -470,16 +579,6 @@ If it's something else:
                   )}
                 </View>
               )}
-              <TouchableOpacity style={styles.button} onPress={() => {
-                setPhoto(null);
-                setBreed(null);
-                setFunFact(null);
-                setLikeness(null);
-                setDogStats(null);
-                setLocation(undefined);
-              }}>
-                <Text style={styles.buttonText}>Take Another Photo</Text>
-              </TouchableOpacity>
             </>
           ) : null}
         </View>
@@ -500,37 +599,37 @@ If it's something else:
               }}
             />
             {/* @ts-ignore - React Native Web will render this as a canvas element */}
-            <canvas
-              ref={canvasRef as any}
-              style={{ display: 'none' }}
-            />
+            <canvas ref={canvasRef as any} style={{ display: 'none' }} />
           </View>
-          <TouchableOpacity style={styles.captureButton} onPress={takePicture}>
-            <View style={styles.captureButtonInner} />
-          </TouchableOpacity>
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity style={styles.button} onPress={takePicture}>
+              <Text style={styles.buttonText}>Capture Photo</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.button} onPress={pickImage}>
+              <Text style={styles.buttonText}>Pick Image</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.instructionText}>Take a photo of a dog to identify its breed</Text>
         </View>
       ) : (
         <View style={styles.cameraContainer}>
           <Text style={styles.headerText}>Dog Breed Detector</Text>
-          <Text style={styles.instructionText}>Take a photo of a dog to identify its breed</Text>
-          
           <View style={styles.buttonContainer}>
-            <TouchableOpacity style={styles.button} onPress={takePicture}>
-              <Text style={styles.buttonText}>{Platform.OS === 'web' ? 'Open Camera' : 'Take Photo'}</Text>
-            </TouchableOpacity>
-            
-            {Platform.OS !== 'web' && (
-              <TouchableOpacity style={styles.button} onPress={pickImage}>
-                <Text style={styles.buttonText}>Choose from Gallery</Text>
-              </TouchableOpacity>
-            )}
-            
             {Platform.OS === 'web' && (
-              <TouchableOpacity style={styles.button} onPress={pickImage}>
-                <Text style={styles.buttonText}>Upload from Device</Text>
+              <TouchableOpacity style={styles.button} onPress={startCamera}>
+                <Text style={styles.buttonText}>Open Camera</Text>
               </TouchableOpacity>
             )}
+            {Platform.OS !== 'web' && (
+              <TouchableOpacity style={styles.button} onPress={startCamera}>
+                <Text style={styles.buttonText}>Take Photo</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={styles.button} onPress={pickImage}>
+              <Text style={styles.buttonText}>Pick Image</Text>
+            </TouchableOpacity>
           </View>
+          <Text style={styles.instructionText}>Take a photo of a dog to identify its breed</Text>
         </View>
       )}
     </ScrollView>
@@ -540,163 +639,150 @@ If it's something else:
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#121212',
+    backgroundColor: '#f0f0f0',
   },
   contentContainer: {
-    flexGrow: 1,
-    minHeight: '100%',
-  },
-  cameraContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
     padding: 20,
-  },
-  webCameraContainer: {
-    width: '100%',
-    borderRadius: 10,
-    overflow: 'hidden',
-    marginBottom: 20,
+    alignItems: 'center',
   },
   headerText: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
     marginBottom: 20,
-    textAlign: 'center',
   },
-  instructionText: {
-    fontSize: 16,
-    color: '#ddd',
-    marginBottom: 40,
-    textAlign: 'center',
-  },
-  buttonContainer: {
+  cameraContainer: {
     width: '100%',
-    flexDirection: 'column',
-    justifyContent: 'center',
     alignItems: 'center',
-    gap: 20,
+    marginBottom: 20,
   },
-  button: {
-    backgroundColor: '#7B4B94',
-    paddingVertical: 15,
-    paddingHorizontal: 30,
+  webCameraContainer: {
+    width: '100%',
+    aspectRatio: 4 / 3, // Maintain aspect ratio
     borderRadius: 10,
-    width: '80%',
-    alignItems: 'center',
-  },
-  buttonText: {
-    fontSize: 16,
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  captureButton: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    overflow: 'hidden', // Ensure video/canvas stays within bounds
+    backgroundColor: '#000', // Background for the camera view
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 20,
-  },
-  captureButtonInner: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#fff',
   },
   previewContainer: {
-    flex: 1,
+    width: '100%',
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
+    marginBottom: 20,
   },
   preview: {
     width: '100%',
-    height: '60%',
+    height: 400, // Adjust height as needed
     borderRadius: 10,
-    marginBottom: 20,
+    marginBottom: 15,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+  },
+  button: {
+    backgroundColor: '#007bff',
+    paddingVertical: 12,
+    paddingHorizontal: 25,
+    borderRadius: 25,
+    marginHorizontal: 10,
+    marginBottom: 10, // Add some margin at the bottom
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   breedText: {
-    color: '#fff',
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 10,
+    marginTop: 10,
     textAlign: 'center',
+  },
+  rarityText: { // Style for rarity text
+    fontSize: 16,
+    marginTop: 5,
+    textAlign: 'center',
+    color: '#555',
   },
   likenessText: {
-    color: '#ddd',
     fontSize: 16,
-    marginBottom: 15,
+    marginTop: 5,
     textAlign: 'center',
+    color: '#555',
   },
   funFactContainer: {
-    backgroundColor: 'rgba(123, 75, 148, 0.3)',
-    borderRadius: 10,
+    marginTop: 15,
     padding: 15,
-    marginBottom: 20,
+    backgroundColor: '#e9e9eb',
+    borderRadius: 8,
     width: '100%',
   },
   funFactTitle: {
-    color: '#fff',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 5,
   },
   funFactText: {
-    color: '#fff',
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: 14,
+    lineHeight: 20,
   },
   statsContainer: {
-    backgroundColor: 'rgba(123, 75, 148, 0.3)',
-    borderRadius: 10,
+    marginTop: 15,
     padding: 15,
-    marginBottom: 20,
+    backgroundColor: '#e9e9eb',
+    borderRadius: 8,
     width: '100%',
   },
   statsTitle: {
-    color: '#fff',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 10,
   },
   statsGrid: {
-    flexDirection: 'column',
-    gap: 8,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
   },
   statItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 4,
+    width: '48%', // Adjust as needed for spacing
+    marginBottom: 10,
   },
   statLabel: {
-    color: '#ddd',
     fontSize: 14,
     fontWeight: 'bold',
+    color: '#333',
   },
   statValue: {
-    color: '#fff',
     fontSize: 14,
+    color: '#555',
   },
   locationContainer: {
-    backgroundColor: 'rgba(0, 128, 255, 0.3)',
-    borderRadius: 10,
+    marginTop: 15,
     padding: 15,
-    marginBottom: 20,
+    backgroundColor: '#e9e9eb',
+    borderRadius: 8,
     width: '100%',
   },
   locationTitle: {
-    color: '#fff',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 5,
   },
   locationText: {
-    color: '#fff',
     fontSize: 14,
-    lineHeight: 20,
+    color: '#555',
+  },
+  saveStatusText: { // Style for save status text
+    fontSize: 14,
+    marginTop: 10,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  instructionText: {
+    fontSize: 16,
+    marginTop: 20,
+    textAlign: 'center',
+    color: '#555',
   },
 });

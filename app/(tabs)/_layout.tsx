@@ -1,8 +1,7 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Platform } from 'react-native';
+import { Platform, View } from 'react-native';
 
-import { HapticTab } from '@/components/HapticTab';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import TabBarBackground from '@/components/ui/TabBarBackground';
 import { Colors } from '@/constants/Colors';
@@ -16,7 +15,6 @@ export default function TabLayout() {
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
-        tabBarButton: HapticTab,
         tabBarBackground: TabBarBackground,
         tabBarStyle: Platform.select({
           ios: {
@@ -41,10 +39,49 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="dogedex"
+        options={{
+          title: 'Dogedex',
+          tabBarIcon: ({ color }) => (
+            <View className="flex items-center justify-center rounded-full bg-purple-100/10 p-0.5">
+              <IconSymbol 
+                size={28} 
+                name="pawprint.fill" 
+                color={color} 
+                style={{ transform: [{ rotate: '0deg' }] }} 
+              />
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
+          tabBarIcon: ({ color }) => (
+            <View className="flex items-center justify-center rounded-full bg-purple-100/10 p-0.5">
+              <IconSymbol 
+                size={28} 
+                name="person.fill" 
+                color={color} 
+              />
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="camera"
+        options={{
+          title: 'Camera',
+          tabBarIcon: ({ color }) => (
+            <View className="flex items-center justify-center rounded-full bg-purple-100/10 p-0.5">
+              <IconSymbol 
+                size={28} 
+                name="camera.fill" 
+                color={color} 
+              />
+            </View>
+          ),
         }}
       />
     </Tabs>
