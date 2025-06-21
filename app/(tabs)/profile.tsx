@@ -1,66 +1,80 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   SafeAreaView,
   TouchableOpacity,
-  ScrollView,
   Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
-import { createShadowStyle } from '@/utils/shadowStyles';
-import { setHasSeenOnboarding } from '@/utils/onboarding';
+import { clearHasSeenOnboarding } from '@/utils/onboarding';
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
   const router = useRouter();
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
-  const handleReplayOnboarding = () => {
+  useEffect(() => {
+    // This effect should strictly handle redirection after sign-out.
+    if (!user && isSigningOut) {
+      router.replace('/auth');
+    }
+  }, [user, isSigningOut, router]);
+
+  const handleReplayOnboarding = async () => {
+    try {
+      console.log("Clearing onboarding status...");
+      await clearHasSeenOnboarding();
+      console.log("Onboarding status cleared successfully");
+      console.log("Navigating to onboarding...");
+      router.push('/onboarding');
+      console.log("Navigation to onboarding initiated");
+    } catch (error) {
+      console.error('Error replaying onboarding:', error);
+      Alert.alert('Error', 'Could not replay the tutorial. Please try again.');
+    }
+  };
+
+  const confirmReplayOnboarding = () => {
     Alert.alert(
       'Replay Tutorial',
-      'Would you like to view the onboarding screens again?',
+      'Are you sure you want to view the onboarding screens again?',
       [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Replay',
-          onPress: async () => {
-            // Reset onboarding status (it will be set to true again when user completes onboarding)
-            await setHasSeenOnboarding();
-            // Navigate to onboarding
-            router.push('/onboarding');
-          },
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Replay', 
+          style: 'default',
+          onPress: handleReplayOnboarding 
         },
       ]
     );
   };
 
   const handleSignOut = async () => {
+    try {
+      console.log("Starting sign out process...");
+      setIsSigningOut(true);
+      await clearHasSeenOnboarding();
+      await signOut();
+      console.log("Sign out completed, effect should redirect now");
+      // The useEffect will handle the redirection.
+    } catch (error) {
+      setIsSigningOut(false); // Reset on error
+      console.error('Sign out error:', error);
+      Alert.alert('Error', 'Failed to sign out. Please try again.');
+    }
+  };
+
+  const confirmSignOut = () => {
     Alert.alert(
       'Sign Out',
       'Are you sure you want to sign out?',
       [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await signOut();
-              router.replace('/auth');
-            } catch (error: any) {
-              Alert.alert('Error', error.message);
-            }
-          },
-        },
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign Out', style: 'destructive', onPress: handleSignOut },
       ]
     );
   };
@@ -99,27 +113,31 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.menuContainer}>
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity style={styles.menuItem} onPress={() => Alert.alert('Coming Soon', 'This feature is under development.')}>
             <Text style={styles.menuItemText}>Settings</Text>
           </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.menuItem, styles.highlightedMenuItem]} 
-            onPress={handleReplayOnboarding}
+          <TouchableOpacity
+            style={[styles.menuItem, styles.highlightedMenuItem]}
+            onPress={confirmReplayOnboarding}
           >
             <View style={styles.menuItemRow}>
               <Text style={[styles.menuItemText, {color: '#FF6B6B'}]}>Replay Tutorial</Text>
               <Text style={styles.menuItemIcon}>🔄</Text>
             </View>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity style={styles.menuItem} onPress={() => Alert.alert('Coming Soon', 'This feature is under development.')}>
             <Text style={styles.menuItemText}>Help & Support</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity style={styles.menuItem} onPress={() => Alert.alert('Coming Soon', 'This feature is under development.')}>
             <Text style={styles.menuItemText}>Privacy Policy</Text>
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
+        <TouchableOpacity
+          style={styles.signOutButton}
+          onPress={confirmSignOut}
+          activeOpacity={0.7}
+        >
           <Text style={styles.signOutText}>Sign Out</Text>
         </TouchableOpacity>
       </View>

@@ -2,13 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
-import SplashScreen from '@/components/SplashScreen';
 import { getHasSeenOnboarding } from '@/utils/onboarding';
 
 export default function Index() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const [showSplash, setShowSplash] = React.useState(true);
   const [hasSeenOnboarding, setHasSeenOnboarding] = useState<boolean | null>(null);
 
   // Check if user has seen onboarding
@@ -21,7 +19,7 @@ export default function Index() {
   }, []);
 
   useEffect(() => {
-    if (!loading && !showSplash && hasSeenOnboarding !== null) {
+    if (!loading && hasSeenOnboarding !== null) {
       if (user) {
         // If user is logged in but hasn't seen onboarding, show it
         if (!hasSeenOnboarding) {
@@ -33,15 +31,8 @@ export default function Index() {
         router.replace('/auth');
       }
     }
-  }, [user, loading, showSplash, hasSeenOnboarding]);
+  }, [user, loading, hasSeenOnboarding]);
 
-  if (showSplash) {
-    return <SplashScreen onFinish={() => setShowSplash(false)} />;
-  }
-
-  if (loading) {
-    return <View style={{ flex: 1, backgroundColor: '#FF6B6B' }} />;
-  }
-
-  return <View style={{ flex: 1, backgroundColor: '#FF6B6B' }} />;
+  // Optionally, render nothing or a loading indicator while redirecting
+  return <View />;
 }

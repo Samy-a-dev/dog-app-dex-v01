@@ -11,6 +11,14 @@ export async function setHasSeenOnboarding(): Promise<void> {
   }
 }
 
+export async function clearHasSeenOnboarding(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(ONBOARDING_KEY);
+  } catch (error) {
+    console.error('Error clearing onboarding status:', error);
+  }
+}
+
 export async function getHasSeenOnboarding(): Promise<boolean> {
   try {
     const value = await AsyncStorage.getItem(ONBOARDING_KEY);

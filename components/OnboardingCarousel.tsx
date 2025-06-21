@@ -53,10 +53,13 @@ export default function OnboardingCarousel() {
   const scrollX = useRef(new Animated.Value(0)).current;
   const router = useRouter();
 
+  console.log('OnboardingCarousel rendered with currentIndex:', currentIndex);
+
   const handleNext = () => {
     if (currentIndex < slides.length - 1) {
-      flatListRef.current?.scrollToIndex({ index: currentIndex + 1 });
-      setCurrentIndex(currentIndex + 1);
+      const nextIndex = currentIndex + 1;
+      flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
+      setCurrentIndex(nextIndex);
     } else {
       handleFinish();
     }
@@ -73,7 +76,8 @@ export default function OnboardingCarousel() {
     router.replace('/(tabs)');
   };
 
-  const renderItem = ({ item }: { item: typeof slides[0] }) => {
+  const renderItem = ({ item, index }: { item: typeof slides[0], index: number }) => {
+    console.log('Rendering item:', item.id, 'at index:', index);
     return (
       <View style={styles.slide}>
         <LinearGradient
@@ -104,14 +108,21 @@ export default function OnboardingCarousel() {
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
+        scrollEventThrottle={16}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { x: scrollX } } }],
           { useNativeDriver: false }
         )}
         onMomentumScrollEnd={(event) => {
           const index = Math.round(event.nativeEvent.contentOffset.x / width);
+          console.log('Scroll ended, setting index to:', index);
           setCurrentIndex(index);
         }}
+        getItemLayout={(data, index) => ({
+          length: width,
+          offset: width * index,
+          index,
+        })}
       />
 
       <View style={styles.footer}>
@@ -146,7 +157,7 @@ export default function OnboardingCarousel() {
               end={{ x: 1, y: 0 }}
             >
               <Text style={styles.nextButtonText}>
-                {currentIndex === slides.length - 1 ? 'Get Started' : 'Next'}
+                {currentIndex === slides.length - 1 ? 'Get Started' : `Next (${currentIndex + 1}/${slides.length})`}
               </Text>
             </LinearGradient>
           </TouchableOpacity>
