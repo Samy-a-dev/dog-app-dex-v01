@@ -64,7 +64,46 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: createSupabaseStorage(),
     autoRefreshToken: true,
-    persistSession: typeof window !== 'undefined', // Only persist session in browser
+    persistSession: true, // Persist session on all platforms
     detectSessionInUrl: typeof window !== 'undefined', // Only detect session in browser
   },
 });
+
+export async function saveCapturedDog(
+  userId: string,
+  imageUri: string,
+  breed: string,
+  likeness: number,
+  locationData: any, // Use a more specific type if available
+  timestamp: number,
+  rarity: string
+) {
+  try {
+    const { data, error } = await supabase
+      .from('captured_dogs') // Assuming your table is named 'captured_dogs'
+      .insert([
+        {
+          user_id: userId,
+          image_url: imageUri,
+          breed: breed,
+          likeness: likeness,
+          latitude: locationData?.latitude,
+          longitude: locationData?.longitude,
+          timestamp: new Date(timestamp).toISOString(), // Convert timestamp to ISO string
+          rarity: rarity,
+        },
+      ])
+      .select(); // Select the inserted data
+
+    if (error) {
+      console.error('Error saving captured dog:', error);
+      return null;
+    }
+
+    console.log('Captured dog data saved successfully:', data);
+    return data ? data[0] : null; // Return the first inserted row
+  } catch (error) {
+    console.error('Exception saving captured dog:', error);
+    return null;
+  }
+}
