@@ -129,11 +129,23 @@ export default function SearchBreedsScreen() {
   }, [debouncedQuery]);
 
   const renderBreedItem = ({ item }: { item: BreedSearchResult }) => (
-    <View style={styles.breedCard}>
-      <Image source={{ uri: item.image_url }} style={styles.breedImage} />
-      <Text style={styles.breedName}>{item.name}</Text>
-      {item.breed_group && <Text style={styles.breedGroup}>{item.breed_group}</Text>}
-    </View>
+    <TouchableOpacity
+      style={styles.breedCardTouchable}
+      onPress={() => {
+        if (item.reference_image_id) {
+          router.push(`/breed/${item.reference_image_id}`);
+        } else {
+          // Optionally, handle cases where reference_image_id is missing, e.g., show an alert
+          console.warn("Missing reference_image_id for breed:", item.name);
+        }
+      }}
+    >
+      <View style={styles.breedCard}>
+        <Image source={{ uri: item.image_url }} style={styles.breedImage} />
+        <Text style={styles.breedName} numberOfLines={1} ellipsizeMode="tail">{item.name}</Text>
+        {item.breed_group && <Text style={styles.breedGroup} numberOfLines={1} ellipsizeMode="tail">{item.breed_group}</Text>}
+      </View>
+    </TouchableOpacity>
   );
 
   return (
@@ -250,9 +262,13 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 20,
   },
-  breedCard: {
+  breedCardTouchable: { // Style for the TouchableOpacity wrapper
     flex: 1,
-    margin: 8,
+    margin: 8, // This margin is for the touchable area
+    maxWidth: (width / 2) - 24, // Ensure touchable area respects column layout
+    borderRadius: 12, // Apply borderRadius to touchable as well if it's the outer element
+  },
+  breedCard: { // Style for the inner View containing content
     backgroundColor: 'white',
     borderRadius: 12,
     padding: 12,
@@ -264,7 +280,7 @@ const styles = StyleSheet.create({
       shadowRadius: 4,
       elevation: 3,
     }),
-    maxWidth: (width / 2) - 24, // For 2 columns with margins
+    // flex: 1 and maxWidth are handled by breedCardTouchable now
   },
   breedImage: {
     width: '100%',

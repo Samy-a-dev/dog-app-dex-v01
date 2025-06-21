@@ -26,6 +26,7 @@ interface Breed {
   breed_group?: string;
   image_url: string;
   backgroundColor: string;
+  reference_image_id?: string; // Added for navigation to detail screen
 }
 import { useAuth } from '@/contexts/AuthContext';
 import { createShadowStyle } from '@/utils/shadowStyles';
@@ -65,6 +66,7 @@ const router = useRouter();
           breed_group: breed.breed_group,
           image_url: breed.image?.url || 'https://via.placeholder.com/150', // Fallback image
           backgroundColor: cardBackgroundColors[index % cardBackgroundColors.length],
+          reference_image_id: breed.reference_image_id, // Added
         }));
         setExploreBreedsData(formattedBreeds);
       } catch (e: any) {
@@ -116,11 +118,24 @@ const router = useRouter();
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.exploreList}>
               {exploreBreedsData.map(breed => (
-                <View key={breed.id} style={[styles.exploreBreedCard, { backgroundColor: breed.backgroundColor }]}>
-                  <Image source={{ uri: breed.image_url }} style={styles.breedImage} />
-                  <Text style={styles.breedPrimaryName} numberOfLines={1} ellipsizeMode="tail">{breed.name}</Text>
-                  {breed.breed_group && <Text style={styles.breedSecondaryName} numberOfLines={1} ellipsizeMode="tail">{breed.breed_group}</Text>}
-                </View>
+                <TouchableOpacity
+                  key={breed.id}
+                  style={styles.exploreBreedCardTouchable} // Using a separate style for the touchable if needed, or reuse exploreBreedCard
+                  onPress={() => {
+                    if (breed.reference_image_id) {
+                      router.push(`/breed/${breed.reference_image_id}`);
+                    } else {
+                      console.warn("Missing reference_image_id for breed on home screen:", breed.name);
+                      // Optionally, alert the user or disable interaction
+                    }
+                  }}
+                >
+                  <View style={[styles.exploreBreedCard, { backgroundColor: breed.backgroundColor }]}>
+                    <Image source={{ uri: breed.image_url }} style={styles.breedImage} />
+                    <Text style={styles.breedPrimaryName} numberOfLines={1} ellipsizeMode="tail">{breed.name}</Text>
+                    {breed.breed_group && <Text style={styles.breedSecondaryName} numberOfLines={1} ellipsizeMode="tail">{breed.breed_group}</Text>}
+                  </View>
+                </TouchableOpacity>
               ))}
             </ScrollView>
           )}
@@ -239,6 +254,14 @@ exploreBreedsContainer: {
   exploreList: {
     paddingLeft: 5, // Start cards slightly indented
     paddingRight: 15, // Ensure last card has some space
+  },
+exploreBreedCardTouchable: {
+    // Ensures the touchable area matches the card's visual dimensions and layout needs
+    width: width * 0.35,
+    height: width * 0.45,
+    marginRight: 15,
+    borderRadius: 12, // Match card's border radius for consistent touch feedback
+    // Note: backgroundColor and shadow are applied to the inner View (exploreBreedCard)
   },
   exploreBreedCard: {
     width: width * 0.35, // Adjust card width to show ~2.5 cards
