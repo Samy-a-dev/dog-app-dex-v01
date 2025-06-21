@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
+import { Platform } from 'react-native';
 import { supabase } from '@/lib/supabase';
+import { debugOAuth } from '@/utils/debugOAuth';
 
 interface AuthContextType {
   user: User | null;
@@ -9,7 +11,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
-  signInWithProvider: (provider: 'google' | 'apple') => Promise<void>;
+  signInWithProvider: (provider: 'google' | 'apple') => Promise<any>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -61,10 +63,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signInWithProvider = async (provider: 'google' | 'apple') => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider,
-    });
-    if (error) throw error;
+    try {
+      console.log(`Starting ${provider} sign-in...`);
+      
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: Platform.OS === 'web' 
+            ? `${window.location.origin}/auth/callback`
+            : 'dogappdexv01://auth/callback',
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
+      
+      if (error) {
+        console.error(`${provider} sign-in error:`, error);
+        throw new Error(`${provider} sign-in failed: ${error.message}`);
+      }
+      
+      console.log(`${provider} sign-in initiated successfully`);
+      return data;
+    } catch (error: any) {
+      console.error(`${provider} sign-in exception:`, error);
+      
+      // Use debug utility for troubleshooting
+      await debugOAuth.troubleshootOAuth(provider, error);
+      
+      // Handle specific Android/OAuth errors
+      if (error.message?.includes('Failed to download remote update')) {
+        throw new Error('Network connection issue. Please check your internet connection and try again.');
+      } else if (error.message?.includes('java.io.IOException')) {
+        throw new Error('Authentication service temporarily unavailable. Please try again.');
+      } else if (error.message?.includes('OAuth')) {
+        throw new Error('Authentication failed. Please try again or use email/password login.');
+      }
+      
+      throw error;
+    }
   };
 
   return (

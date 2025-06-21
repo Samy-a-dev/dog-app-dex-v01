@@ -66,7 +66,13 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     storage: createSupabaseStorage(),
     autoRefreshToken: true,
     persistSession: true, // Persist session on all platforms
-    detectSessionInUrl: typeof window !== 'undefined', // Only detect session in browser
+    detectSessionInUrl: Platform.OS === 'web', // Only detect session in browser
+    flowType: 'pkce', // Use PKCE flow for better security
+  },
+  global: {
+    headers: {
+      'X-Client-Info': `${Platform.OS}-app`,
+    },
   },
 });
 

@@ -66,13 +66,39 @@ export default function LoginScreen() {
   const handleSocialLogin = async (provider: 'google') => {
     setStatusMessage('');
     setStatusType('');
+    setLoading(true);
+    
     try {
-      await signInWithProvider(provider);
-      // Skip showing success message and navigate directly to onboarding
-      router.replace('/onboarding');
+      console.log(`Starting ${provider} authentication...`);
+      
+      const result = await signInWithProvider(provider);
+      console.log(`${provider} authentication result:`, result);
+      
+      // For OAuth, we typically get redirected, so we might not reach here
+      // But if we do, navigate to onboarding
+      if (result) {
+        router.replace('/onboarding');
+      }
     } catch (error: any) {
-      setStatusMessage(error?.message || 'Social login failed.');
+      console.error(`${provider} login error:`, error);
+      
+      let errorMessage = 'Authentication failed. Please try again.';
+      
+      // Handle specific error types
+      if (error.message?.includes('Network')) {
+        errorMessage = 'Network error. Please check your internet connection.';
+      } else if (error.message?.includes('remote update')) {
+        errorMessage = 'Authentication service temporarily unavailable. Try email/password login.';
+      } else if (error.message?.includes('OAuth')) {
+        errorMessage = 'Google sign-in failed. Please try email/password login instead.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      setStatusMessage(errorMessage);
       setStatusType('error');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -158,11 +184,19 @@ export default function LoginScreen() {
             {/* Social Login Buttons */}
             <View style={styles.socialContainer}>
               <TouchableOpacity
-                style={styles.socialButton}
+                style={[styles.socialButton, loading && styles.socialButtonDisabled]}
                 onPress={() => handleSocialLogin('google')}
+                disabled={loading}
               >
-                <Text style={styles.socialButtonText}>Continue with Google</Text>
+                <Text style={styles.socialButtonText}>
+                  {loading ? 'Connecting...' : 'Continue with Google'}
+                </Text>
               </TouchableOpacity>
+              
+              {/* Fallback notice */}
+              <Text style={styles.fallbackText}>
+                Having trouble with Google sign-in? Use email/password above.
+              </Text>
             </View>
 
             <TouchableOpacity
@@ -314,10 +348,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'white',
   },
+  socialButtonDisabled: {
+    opacity: 0.6,
+  },
   socialButtonText: {
     fontSize: 16,
     color: '#333',
     fontWeight: '500',
+  },
+  fallbackText: {
+    fontSize: 12,
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 8,
   },
   switchMode: {
     alignItems: 'center',
