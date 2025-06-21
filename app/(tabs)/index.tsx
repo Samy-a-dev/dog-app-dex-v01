@@ -9,7 +9,8 @@ import {
   Dimensions,
   Platform,
   Image,
-  ActivityIndicator // Added
+  ActivityIndicator, // Added
+  useWindowDimensions
 } from 'react-native';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
@@ -36,7 +37,9 @@ const { width } = Dimensions.get('window');
 
 export default function HomeScreen() {
   const { user } = useAuth();
-const router = useRouter();
+  const router = useRouter();
+  const { width: screenWidth } = useWindowDimensions();
+  const logoWidth = Math.min(screenWidth * 0.65, 240); // Responsive width with max size
   const [exploreBreedsData, setExploreBreedsData] = useState<Breed[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -86,11 +89,23 @@ const router = useRouter();
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+      <View style={{
+        paddingTop: 20,
+        paddingBottom: 15,
+        paddingHorizontal: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center', // Center the logo
+      }}>
         <Image 
           source={require('@/assets/images/company-logo-name.png')} 
-          style={styles.logo}
+          style={{
+            width: logoWidth,
+            height: logoWidth * 0.4, // Maintain aspect ratio
+            alignSelf: 'center',
+          }}
           resizeMode="contain"
+          accessibilityLabel="Dogedex logo" // Add accessibility label
         />
       </View>
 
