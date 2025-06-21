@@ -6,6 +6,8 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  totalXp: number | null; // Added
+  loadingXp: boolean; // Added
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -18,21 +20,71 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [totalXp, setTotalXp] = useState<number | null>(null); // Added
+  const [loadingXp, setLoadingXp] = useState(true); // Added
+
+  const fetchUserXp = async (userId: string) => {
+    console.log(`[XP DEBUG] AuthContext: fetchUserXp called for user ID: ${userId}`);
+    setLoadingXp(true);
+    try {
+      const { data, error, status } = await supabase
+        .from('user_profiles')
+        .select('total_xp')
+        .eq('user_id', userId)
+        .single();
+
+      console.log(`[XP DEBUG] AuthContext: Supabase response for user_profiles. Data: ${JSON.stringify(data)}, Error: ${JSON.stringify(error)}, Status: ${status}`);
+
+      if (error && error.code !== 'PGRST116') { // PGRST116: 0 rows (single row expected but not found)
+        console.error('[XP DEBUG] AuthContext: Error fetching user XP from Supabase:', error);
+        setTotalXp(0); // Default to 0 on error
+      } else if (data) {
+        console.log(`[XP DEBUG] AuthContext: Successfully fetched XP: ${data.total_xp}. Setting state.`);
+        setTotalXp(data.total_xp);
+      } else {
+        // This case handles PGRST116 (no rows found) or if data is null for other reasons.
+        console.log('[XP DEBUG] AuthContext: No XP profile data found for user (or error PGRST116). Defaulting totalXp to 0.');
+        setTotalXp(0); // Default to 0 if no profile exists
+      }
+    } catch (e) {
+      console.error('[XP DEBUG] AuthContext: Exception during fetchUserXp:', e);
+      setTotalXp(0); // Default to 0 on exception
+    } finally {
+      console.log('[XP DEBUG] AuthContext: Finished fetchUserXp try-catch block. Setting loadingXp to false.');
+      setLoadingXp(false);
+    }
+  };
 
   useEffect(() => {
+    setLoading(true);
+    setLoadingXp(true);
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+      setSession(initialSession);
+      const currentUser = initialSession?.user ?? null;
+      setUser(currentUser);
+      if (currentUser) {
+        fetchUserXp(currentUser.id);
+      } else {
+        setTotalXp(null);
+        setLoadingXp(false);
+      }
       setLoading(false);
     });
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
+      (_event, newSession) => {
+        setSession(newSession);
+        const currentUser = newSession?.user ?? null;
+        setUser(currentUser);
+        if (currentUser) {
+          fetchUserXp(currentUser.id);
+        } else {
+          setTotalXp(null);
+          setLoadingXp(false);
+        }
+        setLoading(false); // Ensure loading is set to false after auth state change
       }
     );
 
@@ -73,6 +125,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         session,
         loading,
+        totalXp, // Added
+        loadingXp, // Added
         signIn,
         signUp,
         signOut,
