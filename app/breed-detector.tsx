@@ -1,11 +1,19 @@
 import React, { useState } from 'react';
-import { View, TouchableOpacity, Text, ScrollView } from 'react-native';
+import { View, TouchableOpacity, Text, ScrollView, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import DogBreedCamera from '../components/DogBreedCamera';
+import { useAuth } from '@/contexts/AuthContext';
+import { saveCapturedDog } from '@/lib/supabase';
 
 export default function BreedDetectorScreen() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('detect');
+  const [detectedBreed, setDetectedBreed] = useState<string | null>(null);
+  const [detectedLikeness, setDetectedLikeness] = useState<number | null>(null);
+  const [detectedLocation, setDetectedLocation] = useState<any>(null);
+  const [currentImageUri, setCurrentImageUri] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const tabs = [
     { id: 'detect', title: 'Detect' },
@@ -14,20 +22,79 @@ export default function BreedDetectorScreen() {
     { id: 'saved', title: 'Saved' }
   ];
 
-  const handleBreedDetected = (breed: string) => {
-    console.log('Detected breed:', breed);
-    // You can add additional handling here, such as saving to history
+  const handleBreedDetected = (breed: string, funFact?: string, likeness?: number, location?: any, imageUri?: string) => {
+    console.log('Detected breed:', breed, 'Image URI:', imageUri);
+    setDetectedBreed(breed);
+    setDetectedLikeness(likeness || null);
+    setDetectedLocation(location || null);
+    setCurrentImageUri(imageUri || null);
   };
 
   const handleGoBack = () => {
     router.replace('/');
   };
 
+  const handleSaveImage = async () => {
+    if (!user) {
+      Alert.alert('Login Required', 'Please log in to save images');
+      return;
+    }
+
+    if (!currentImageUri || !detectedBreed || !detectedLocation) {
+      Alert.alert('Cannot Save', 'Missing required information to save the image');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const timestamp = detectedLocation.timestamp || Date.now();
+      const savedDog = await saveCapturedDog(
+        user.id,
+        currentImageUri,
+        detectedBreed,
+        detectedLikeness || 0,
+        detectedLocation,
+        timestamp,
+        'Unknown' // Default rarity if not provided
+      );
+
+      if (savedDog) {
+        Alert.alert('Success', 'Image saved successfully!');
+      } else {
+        Alert.alert('Error', 'Failed to save the image');
+      }
+    } catch (error) {
+      console.error('Error saving image:', error);
+      Alert.alert('Error', 'An error occurred while saving the image');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const renderTabContent = () => {
     switch(activeTab) {
       case 'detect':
         // Don't wrap DogBreedCamera in any additional view to avoid nested ScrollView issues
-        return <DogBreedCamera onBreedDetected={handleBreedDetected} />;
+        return (
+          <>
+            <DogBreedCamera 
+              onBreedDetected={handleBreedDetected} 
+            />
+            {currentImageUri && detectedBreed && (
+              <View className="w-full flex items-center mt-4">
+                <TouchableOpacity 
+                  onPress={handleSaveImage}
+                  disabled={isSaving}
+                  className="bg-[#7B4B94] py-3 px-6 rounded-full flex-row items-center justify-center">
+                  <Ionicons name="save-outline" size={20} color="white" />
+                  <Text className="text-white font-bold ml-2">
+                    {isSaving ? 'Saving...' : 'Save Image'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </>
+        );
       case 'recent':
         return (
           <ScrollView className="flex-1" contentContainerStyle={{padding: 16, alignItems: 'center', justifyContent: 'center'}}>

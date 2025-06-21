@@ -23,7 +23,7 @@ interface DogStats {
 }
 
 interface Props {
-  onBreedDetected?: (breed: string, funFact?: string, likeness?: number, location?: LocationData) => void;
+  onBreedDetected?: (breed: string, funFact?: string, likeness?: number, location?: LocationData, imageUri?: string) => void;
 }
 
 export default function DogBreedCamera({ onBreedDetected }: Props) {
@@ -393,7 +393,7 @@ If it's something else:
 
         if (onBreedDetected) {
           console.log('Calling onBreedDetected callback with location:', locationData);
-          onBreedDetected(detectedBreed, detectedFunFact, detectedLikeness, locationData);
+          onBreedDetected(detectedBreed, detectedFunFact, detectedLikeness, locationData, imageUri);
         }
 
         // Save captured dog data to Supabase
@@ -445,7 +445,7 @@ If it's something else:
         console.log('JSON parsing failed, falling back to text analysis. Detected breed:', detectedBreed);
         if (onBreedDetected) {
           console.log('Calling onBreedDetected callback (fallback) with location:', locationData);
-          onBreedDetected(detectedBreed, undefined, undefined, locationData);
+          onBreedDetected(detectedBreed, undefined, undefined, locationData, imageUri);
         }
         setSaveStatus('Detection Error'); // Indicate detection error
       }
