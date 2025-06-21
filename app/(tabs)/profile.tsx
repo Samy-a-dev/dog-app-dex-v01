@@ -10,8 +10,30 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
-import { supabase } from '@/lib/supabase';
+import { supabase, getCapturedDogs } from '@/lib/supabase'; // Modified import
 import { setHasSeenOnboarding, clearHasSeenOnboarding } from '@/utils/onboarding';
+
+const milestones = [
+  { name: 'Dogédex Master', minXp: 10000, level: 5 },
+  { name: 'Top Dog', minXp: 5000, level: 4 },
+  { name: 'Leash Legend', minXp: 2500, level: 3 },
+  { name: 'Pawfessional', minXp: 1000, level: 2 },
+  { name: 'Woof Wrangler', minXp: 0, level: 1 },
+];
+
+const calculateLevelAndTitle = (xp: number | null): { level: number | null; title: string | null } => {
+  if (xp === null || xp < 0) {
+    // Default to level 1, Woof Wrangler if XP is null or invalid
+    return { level: 1, title: milestones[milestones.length - 1].name };
+  }
+  for (const milestone of milestones) {
+    if (xp >= milestone.minXp) {
+      return { level: milestone.level, title: milestone.name };
+    }
+  }
+  // Fallback, though theoretically unreachable if milestones include a 0 minXp entry
+  return { level: 1, title: milestones[milestones.length - 1].name };
+};
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
@@ -19,59 +41,90 @@ export default function ProfileScreen() {
   const [totalXp, setTotalXp] = useState<number | null>(null);
   const [loadingXp, setLoadingXp] = useState(true);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [breedsCollectedCount, setBreedsCollectedCount] = useState<number | null>(null);
+  const [loadingBreedsCount, setLoadingBreedsCount] = useState(true);
+  const [dogLevel, setDogLevel] = useState<number | null>(null);
+  const [userTitle, setUserTitle] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchUserXp = async () => {
-      console.log('[XP DEBUG] ProfileScreen: fetchUserXp called.');
+    const fetchProfileData = async () => {
       if (user) {
-        console.log(`[XP DEBUG] ProfileScreen: User found (ID: ${user.id}). Fetching XP.`);
         setLoadingXp(true);
+        setLoadingBreedsCount(true);
+
+        // Fetch Total XP
         try {
-          const { data, error, status } = await supabase
+          console.log(`[XP DEBUG] ProfileScreen: User found (ID: ${user.id}). Fetching XP.`);
+          const { data: xpData, error: xpError } = await supabase
             .from('user_profiles')
             .select('total_xp')
             .eq('user_id', user.id)
             .single();
 
-          console.log(`[XP DEBUG] ProfileScreen: Supabase response for user_profiles. Data: ${JSON.stringify(data)}, Error: ${JSON.stringify(error)}, Status: ${status}`);
-
-          if (error && error.code !== 'PGRST116') { // PGRST116: 0 rows (single row expected but not found)
-            console.error('[XP DEBUG] ProfileScreen: Error fetching user XP from Supabase:', error);
+          if (xpError && xpError.code !== 'PGRST116') {
+            console.error('[XP DEBUG] ProfileScreen: Error fetching user XP:', xpError);
             setTotalXp(0);
-          } else if (data) {
-            console.log(`[XP DEBUG] ProfileScreen: Successfully fetched XP: ${data.total_xp}. Setting state.`);
-            setTotalXp(data.total_xp);
+          } else if (xpData) {
+            console.log(`[XP DEBUG] ProfileScreen: Successfully fetched XP: ${xpData.total_xp}.`);
+            setTotalXp(xpData.total_xp);
           } else {
-            // This case handles PGRST116 (no rows found) or if data is null for other reasons.
-            console.log('[XP DEBUG] ProfileScreen: No XP profile data found for user (or error PGRST116). Defaulting totalXp to 0.');
+            console.log('[XP DEBUG] ProfileScreen: No XP profile data found for user. Defaulting totalXp to 0.');
             setTotalXp(0);
           }
         } catch (e) {
-          console.error('[XP DEBUG] ProfileScreen: Exception during fetchUserXp:', e);
+          console.error('[XP DEBUG] ProfileScreen: Exception fetching user XP:', e);
           setTotalXp(0);
         } finally {
-          console.log('[XP DEBUG] ProfileScreen: Finished fetchUserXp try-catch block. Setting loadingXp to false.');
           setLoadingXp(false);
         }
+
+        // Fetch Breeds Collected Count
+        try {
+          console.log(`[BREEDS DEBUG] ProfileScreen: Fetching captured dogs for user ID: ${user.id}.`);
+          const capturedDogs = await getCapturedDogs(user.id);
+          if (capturedDogs && capturedDogs.length > 0) {
+            const uniqueBreeds = new Set(capturedDogs.map(dog => dog.breed_name));
+            console.log(`[BREEDS DEBUG] ProfileScreen: Found ${uniqueBreeds.size} unique breeds.`);
+            setBreedsCollectedCount(uniqueBreeds.size);
+          } else {
+            console.log(`[BREEDS DEBUG] ProfileScreen: No captured dogs found or empty array.`);
+            setBreedsCollectedCount(0);
+          }
+        } catch (e) {
+          console.error('[BREEDS DEBUG] ProfileScreen: Exception fetching captured dogs:', e);
+          setBreedsCollectedCount(0);
+        } finally {
+          setLoadingBreedsCount(false);
+        }
       } else {
-        console.log('[XP DEBUG] ProfileScreen: No user found. Setting totalXp to null and loadingXp to false.');
-        setTotalXp(null); // No user, no XP
+        // No user
+        console.log('[PROFILE DEBUG] ProfileScreen: No user found. Resetting profile states.');
+        setTotalXp(null);
+        setBreedsCollectedCount(null);
+        // setDogLevel(null); // Level/title will be set by the other useEffect based on totalXp
+        // setUserTitle(null);
         setLoadingXp(false);
+        setLoadingBreedsCount(false);
       }
     };
 
-    fetchUserXp();
-    // Consider adding a listener for Supabase real-time updates on user_profiles if needed.
-    // For example, if XP can be updated from other parts of the app or backend processes.
-    // const channel = supabase.channel(`user-profile-${user?.id}`)
-    //   .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'user_profiles', filter: `user_id=eq.${user?.id}` }, payload => {
-    //     setTotalXp((payload.new as { total_xp: number }).total_xp);
-    //   })
-    //   .subscribe();
-    // return () => {
-    //   supabase.removeChannel(channel);
-    // };
+    fetchProfileData();
   }, [user]);
+
+  // Effect to calculate level and title when totalXp changes
+  useEffect(() => {
+    // if (totalXp !== null) { // This condition means it won't update if totalXp is 0
+    const { level, title } = calculateLevelAndTitle(totalXp);
+    console.log(`[LEVEL DEBUG] ProfileScreen: Calculated level: ${level}, title: ${title} for XP: ${totalXp}`);
+    setDogLevel(level);
+    setUserTitle(title);
+    // } else {
+      // If totalXp is null (e.g., no user), set default level and title from calculateLevelAndTitle
+      // const { level, title } = calculateLevelAndTitle(null);
+      // setDogLevel(level);
+      // setUserTitle(title);
+    // }
+  }, [totalXp]);
 
   const handleReplayOnboarding = async () => {
     try {
@@ -139,23 +192,19 @@ export default function ProfileScreen() {
           <Text style={styles.userName}>
             {user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Dog Lover'}
           </Text>
-          <Text style={styles.userTitle}>Dog Collector</Text>
+          <Text style={styles.userTitle}>{loadingXp ? '...' : userTitle ?? 'Dog Collector'}</Text>
         </View>
       </LinearGradient>
 
       <View style={styles.content}>
         <View style={styles.statsContainer}>
           <View style={styles.stat}>
-            <Text style={styles.statNumber}>0</Text>
-            <Text style={styles.statLabel}>Dogs Collected</Text>
+            <Text style={styles.statNumber}>{loadingBreedsCount ? '...' : breedsCollectedCount ?? 0}</Text>
+            <Text style={styles.statLabel}>Breeds Collected</Text>
           </View>
           <View style={styles.stat}>
-            <Text style={styles.statNumber}>0</Text>
-            <Text style={styles.statLabel}>Breeds Found</Text>
-          </View>
-          <View style={styles.stat}>
-            <Text style={styles.statNumber}>0</Text>
-            <Text style={styles.statLabel}>Achievements</Text>
+            <Text style={styles.statNumber}>{loadingXp ? '...' : dogLevel ?? '-'}</Text>
+            <Text style={styles.statLabel}>Dog Level</Text>
           </View>
           <View style={styles.stat}>
             <Text style={styles.statNumber}>{loadingXp ? '...' : totalXp ?? 0}</Text>
@@ -164,9 +213,6 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.menuContainer}>
-          <TouchableOpacity style={styles.menuItem} onPress={() => Alert.alert('Coming Soon', 'This feature is under development.')}>
-            <Text style={styles.menuItemText}>Settings</Text>
-          </TouchableOpacity>
           <TouchableOpacity
             style={[styles.menuItem, styles.highlightedMenuItem]}
             onPress={confirmReplayOnboarding}
@@ -175,12 +221,6 @@ export default function ProfileScreen() {
               <Text style={[styles.menuItemText, {color: '#FF6B6B'}]}>Replay Tutorial</Text>
               <Text style={styles.menuItemIcon}>🔄</Text>
             </View>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.menuItem} onPress={() => Alert.alert('Coming Soon', 'This feature is under development.')}>
-            <Text style={styles.menuItemText}>Help & Support</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.menuItem} onPress={() => Alert.alert('Coming Soon', 'This feature is under development.')}>
-            <Text style={styles.menuItemText}>Privacy Policy</Text>
           </TouchableOpacity>
         </View>
 

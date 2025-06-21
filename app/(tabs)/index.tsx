@@ -7,120 +7,140 @@ import {
   ScrollView,
   TouchableOpacity,
   Dimensions,
-  Platform
+  Platform,
+  Image,
+  ActivityIndicator // Added
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'expo-router';
+
+// TODO: Move this API key to a .env file for security
+const DOG_API_KEY = 'live_jwnKEXgZxbyQwUMZy1yCL3uZ53Qglc8OMUewDlEM5r8ypWH5NDqmYvwVJYr4IqGY';
+const DOG_API_URL = 'https://api.thedogapi.com/v1/breeds';
+
+const cardBackgroundColors = ['#FEF4E7', '#EBF7FA', '#E6F8F3'];
+
+interface Breed {
+  id: string;
+  name: string;
+  breed_group?: string;
+  image_url: string;
+  backgroundColor: string;
+  reference_image_id?: string; // Added for navigation to detail screen
+}
 import { useAuth } from '@/contexts/AuthContext';
 import { createShadowStyle } from '@/utils/shadowStyles';
-import { useRouter } from 'expo-router';
+import XPDisplayCard from '@/components/XPDisplayCard'; // Added import
 
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen() {
   const { user } = useAuth();
-  const router = useRouter();
+const router = useRouter();
+  const [exploreBreedsData, setExploreBreedsData] = useState<Breed[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleLeaderboardPress = () => {
-    try {
-      console.log('Navigating to leaderboard...');
-      router.push('/leaderboard');
-    } catch (error) {
-      console.error('Navigation error:', error);
-    }
+  useEffect(() => {
+    const fetchBreeds = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const response = await fetch(`${DOG_API_URL}?limit=4`, {
+          headers: {
+            'x-api-key': DOG_API_KEY,
+          },
+        });
+        if (!response.ok) {
+          throw new Error(`API request failed with status ${response.status}`);
+        }
+        const data = await response.json();
+        // Ensure data is an array before mapping
+        if (!Array.isArray(data)) {
+          console.error("API did not return an array:", data);
+          throw new Error('Unexpected data format from API.');
+        }
+        const formattedBreeds = data.map((breed: any, index: number) => ({
+          id: breed.id,
+          name: breed.name,
+          breed_group: breed.breed_group,
+          image_url: breed.image?.url || 'https://via.placeholder.com/150', // Fallback image
+          backgroundColor: cardBackgroundColors[index % cardBackgroundColors.length],
+          reference_image_id: breed.reference_image_id, // Added
+        }));
+        setExploreBreedsData(formattedBreeds);
+      } catch (e: any) {
+        console.error("Failed to fetch breeds:", e);
+        setError(e.message || 'Failed to fetch breeds. Please try again later.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchBreeds();
+  }, []);
+
+  const handleSeeAll = () => {
+    router.push('/searchBreeds');
   };
-
-  const dogBreeds = [
-    { id: 1, name: 'Golden Retriever', emoji: '🦮', collected: false },
-    { id: 2, name: 'German Shepherd', emoji: '🐕‍🦺', collected: false },
-    { id: 3, name: 'Bulldog', emoji: '🐶', collected: false },
-    { id: 4, name: 'Poodle', emoji: '🐩', collected: false },
-  ];
 
   return (
     <SafeAreaView style={styles.container}>
-      <LinearGradient
-        colors={['#FF6B6B', '#FF8E53']}
-        style={styles.header}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
-        <View style={styles.headerWithButton}>
-          <View style={styles.headerContent}>
-            <Text style={styles.greeting}>
-              Hello, {user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Dog Lover'}! 🐕
-            </Text>
-            <Text style={styles.subtitle}>Ready to collect some amazing dogs?</Text>
-          </View>
-          <TouchableOpacity
-            style={styles.leaderboardButton}
-            onPress={handleLeaderboardPress}
-            activeOpacity={0.8}
-          >
-            <LinearGradient
-              colors={['rgba(255, 255, 255, 0.9)', 'rgba(255, 255, 255, 0.7)']}
-              style={styles.leaderboardButtonGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <Text style={styles.leaderboardButtonText}>🏆</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
+      <View style={styles.header}>
+        <Image 
+          source={require('@/assets/images/company-logo-name.png')} 
+          style={styles.logo}
+          resizeMode="contain"
+        />
+      </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.welcomeCard}>
-          <Text style={styles.cardTitle}>Welcome to Bingo Dog Collector!</Text>
+          <Text style={styles.cardTitle}>Welcome to Dogedex!</Text>
           <Text style={styles.cardDescription}>
             Start your journey to discover and collect different dog breeds from around the world.
           </Text>
         </View>
 
-        <View style={styles.statsCard}>
-          <Text style={styles.sectionTitle}>Your Collection</Text>
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>0</Text>
-              <Text style={styles.statLabel}>Dogs Collected</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>0</Text>
-              <Text style={styles.statLabel}>Breeds Found</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>0</Text>
-              <Text style={styles.statLabel}>Achievements</Text>
-            </View>
+        <XPDisplayCard /> {/* Added XP Display Card */}
+{/* Explore Breeds Section */}
+        <View style={styles.exploreBreedsContainer}>
+          <View style={styles.exploreHeader}>
+            <Text style={styles.exploreTitle}>Explore Breeds</Text>
+            <TouchableOpacity onPress={handleSeeAll}>
+              <Text style={styles.seeAllText}>See All &gt;</Text>
+            </TouchableOpacity>
           </View>
+          {isLoading ? (
+            <ActivityIndicator size="large" color="#FF6B6B" style={styles.loader} />
+          ) : error ? (
+            <Text style={styles.errorText}>{error}</Text>
+          ) : (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.exploreList}>
+              {exploreBreedsData.map(breed => (
+                <TouchableOpacity
+                  key={breed.id}
+                  style={styles.exploreBreedCardTouchable} // Using a separate style for the touchable if needed, or reuse exploreBreedCard
+                  onPress={() => {
+                    if (breed.reference_image_id) {
+                      router.push(`/breed/${breed.reference_image_id}`);
+                    } else {
+                      console.warn("Missing reference_image_id for breed on home screen:", breed.name);
+                      // Optionally, alert the user or disable interaction
+                    }
+                  }}
+                >
+                  <View style={[styles.exploreBreedCard, { backgroundColor: breed.backgroundColor }]}>
+                    <Image source={{ uri: breed.image_url }} style={styles.breedImage} />
+                    <Text style={styles.breedPrimaryName} numberOfLines={1} ellipsizeMode="tail">{breed.name}</Text>
+                    {breed.breed_group && <Text style={styles.breedSecondaryName} numberOfLines={1} ellipsizeMode="tail">{breed.breed_group}</Text>}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
         </View>
 
-        <View style={styles.breedsSection}>
-          <Text style={styles.sectionTitle}>Popular Breeds</Text>
-          <View style={styles.breedsGrid}>
-            {dogBreeds.map((breed) => (
-              <TouchableOpacity key={breed.id} style={styles.breedCard}>
-                <Text style={styles.breedEmoji}>{breed.emoji}</Text>
-                <Text style={styles.breedName}>{breed.name}</Text>
-                <View style={[styles.collectButton, breed.collected && styles.collected]}>
-                  <Text style={[styles.collectButtonText, breed.collected && styles.collectedText]}>
-                    {breed.collected ? 'Collected' : 'Collect'}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        <TouchableOpacity style={styles.exploreButton}>
-          <LinearGradient
-            colors={['#FF6B6B', '#FF8E53']}
-            style={styles.exploreButtonGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-          >
-            <Text style={styles.exploreButtonText}>Start Exploring</Text>
-          </LinearGradient>
-        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -133,29 +153,14 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingTop: 20,
-    paddingBottom: 30,
-    paddingHorizontal: 20,
-  },
-  headerWithButton: {
+    paddingBottom: 15,
+    paddingHorizontal: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
   },
-  headerContent: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  greeting: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
-    textAlign: 'center',
+  logo: {
+    width: 180,
+    height: 60,
   },
   content: {
     flex: 1,
@@ -186,110 +191,89 @@ const styles = StyleSheet.create({
     color: '#666',
     lineHeight: 24,
   },
-  statsCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    ...createShadowStyle({
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
-    }),
-  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 16,
   },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FF6B6B',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
-  },
-  breedsSection: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
+exploreBreedsContainer: {
+    marginTop: 20,
     marginBottom: 20,
+  },
+  exploreHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingHorizontal: 5, // Slight horizontal padding for the header
+  },
+  exploreTitle: {
+    fontSize: 22, // Slightly larger than sectionTitle
+    fontWeight: 'bold',
+    color: '#2c3e50', // Darker, more prominent color
+  },
+  seeAllText: {
+    fontSize: 16,
+    color: '#3498db', // A distinct color for links
+    fontWeight: '600',
+  },
+  loader: {
+    marginTop: 20,
+    marginBottom: 20,
+  },
+  errorText: {
+    textAlign: 'center',
+    color: 'red',
+    marginTop: 20,
+    marginBottom: 20,
+    paddingHorizontal: 20,
+  },
+  exploreList: {
+    paddingLeft: 5, // Start cards slightly indented
+    paddingRight: 15, // Ensure last card has some space
+  },
+exploreBreedCardTouchable: {
+    // Ensures the touchable area matches the card's visual dimensions and layout needs
+    width: width * 0.35,
+    height: width * 0.45,
+    marginRight: 15,
+    borderRadius: 12, // Match card's border radius for consistent touch feedback
+    // Note: backgroundColor and shadow are applied to the inner View (exploreBreedCard)
+  },
+  exploreBreedCard: {
+    width: width * 0.35, // Adjust card width to show ~2.5 cards
+    height: width * 0.45, // Adjust height to be a bit taller
+    borderRadius: 12,
+    marginRight: 15,
+    padding: 10,
+    justifyContent: 'space-between', // Distribute space for image and text
     ...createShadowStyle({
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.15,
+      shadowRadius: 5,
+      elevation: 4,
     }),
   },
-  breedsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  breedCard: {
-    width: (width - 80) / 2,
-    backgroundColor: '#F9F9F9',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  breedEmoji: {
-    fontSize: 32,
+  breedImage: {
+    width: '100%',
+    height: '60%', // Image takes up more space
+    borderRadius: 8,
     marginBottom: 8,
   },
-  breedName: {
+  breedPrimaryName: {
     fontSize: 14,
     fontWeight: '600',
     color: '#333',
     textAlign: 'center',
-    marginBottom: 12,
   },
-  collectButton: {
-    backgroundColor: '#FF6B6B',
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  collected: {
-    backgroundColor: '#4CAF50',
-  },
-  collectButtonText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  collectedText: {
-    color: 'white',
-  },
-  exploreButton: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginBottom: 30,
-  },
-  exploreButtonGradient: {
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  exploreButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
+  breedSecondaryName: {
+    fontSize: 13,
+    fontWeight: 'bold', // Make it bold as per design
+    color: '#555',
+    textAlign: 'center',
+    marginTop: 2,
   },
   leaderboardButton: {
     width: 50,
