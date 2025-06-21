@@ -172,3 +172,27 @@ export async function saveCapturedDog(
     return null;
   }
 }
+
+export async function getCapturedDogs(userId: string) {
+  if (!userId) {
+    console.error('User ID is required to fetch captured dogs.');
+    return [];
+  }
+  try {
+    const { data, error } = await supabase
+      .from('captured_dogs')
+      .select('id, image_url, breed_name, timestamp, rarity, likeness')
+      .eq('user_id', userId)
+      .order('timestamp', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching captured dogs:', error);
+      return [];
+    }
+    console.log('Fetched captured dogs:', data);
+    return data || [];
+  } catch (error) {
+    console.error('Exception fetching captured dogs:', error);
+    return [];
+  }
+}
