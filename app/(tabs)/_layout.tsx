@@ -48,18 +48,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="profile"
+        name="leaderboard"
         options={{
-          title: 'Profile',
-          tabBarIcon: ({ color }) => (
-            <View className="flex items-center justify-center rounded-full bg-purple-100/10 p-0.5">
-              <IconSymbol 
-                size={28} 
-                name="person.fill" 
-                color={color} 
-              />
-            </View>
-          ),
+          title: 'Leaderboard',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="trophy.fill" color={color} />,
         }}
       />
       <Tabs.Screen

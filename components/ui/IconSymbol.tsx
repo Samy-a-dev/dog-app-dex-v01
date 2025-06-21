@@ -21,6 +21,7 @@ const MAPPING: IconMapping = {
   'pawprint.fill': 'pets',
   'camera.fill': 'camera-alt',
   'person.fill': 'person',
+  'trophy.fill': 'emoji-events',
 };
 
 /**

@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // TODO: Move this API key to a .env file for security
 const DOG_API_KEY = 'live_jwnKEXgZxbyQwUMZy1yCL3uZ53Qglc8OMUewDlEM5r8ypWH5NDqmYvwVJYr4IqGY';
@@ -84,6 +85,10 @@ const router = useRouter();
     router.push('/searchBreeds');
   };
 
+  const handleProfilePress = () => {
+    router.push('/profile');
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -92,6 +97,19 @@ const router = useRouter();
           style={styles.logo}
           resizeMode="contain"
         />
+        <TouchableOpacity 
+          style={styles.profileButton}
+          onPress={handleProfilePress}
+        >
+          <LinearGradient
+            colors={['#FF6B6B', '#FF8E53']}
+            style={styles.profileButtonGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <Text style={styles.profileButtonText}>👤</Text>
+          </LinearGradient>
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -157,10 +175,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
   logo: {
     width: 180,
     height: 60,
+  },
+  profileButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    overflow: 'hidden',
+    ...createShadowStyle({
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+      elevation: 5,
+    }),
+  },
+  profileButtonGradient: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileButtonText: {
+    fontSize: 24,
   },
   content: {
     flex: 1,
