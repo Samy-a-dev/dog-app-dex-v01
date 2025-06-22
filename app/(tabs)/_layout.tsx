@@ -54,6 +54,21 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="trophy.fill" color={color} />,
         }}
       />
+      <Tabs.Screen
+        name="find-walkers" // This will look for app/(tabs)/find-walkers.tsx
+        options={{
+          title: 'Find Walkers',
+          tabBarIcon: ({ color }) => (
+            <View className="flex items-center justify-center rounded-full bg-purple-100/10 p-0.5">
+              <IconSymbol
+                size={28}
+                name="figure.walk" // Example icon, change as needed
+                color={color}
+              />
+            </View>
+          ),
+        }}
+      />
     </Tabs>
   );
 }

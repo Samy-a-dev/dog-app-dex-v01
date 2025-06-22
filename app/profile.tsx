@@ -222,6 +222,15 @@ export default function ProfileScreen() {
               <Text style={styles.menuItemIcon}>🔄</Text>
             </View>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => router.push('/matcher-profile-edit')}
+          >
+            <View style={styles.menuItemRow}>
+              <Text style={styles.menuItemText}>Edit Matcher Profile</Text>
+              <Text style={styles.menuItemIcon}>🐾</Text>
+            </View>
+          </TouchableOpacity>
         </View>
 
         <TouchableOpacity
