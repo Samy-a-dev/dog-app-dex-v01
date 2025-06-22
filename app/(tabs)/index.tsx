@@ -159,7 +159,7 @@ export default function HomeScreen() {
             onPress={handleProfilePress}
           >
             <LinearGradient
-              colors={['rgba(255, 255, 255, 0.2)', 'rgba(255, 255, 255, 0.1)']}
+              colors={['rgba(255, 255, 255, 0.95)', 'rgba(255, 255, 255, 0.85)']}
               style={styles.profileButtonGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}

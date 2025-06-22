@@ -75,17 +75,25 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="find-walkers"
+        options={{
+          title: 'Find Walkers',
+          tabBarIcon: ({ color }) => (
+            <View className="flex items-center justify-center rounded-full bg-purple-100/10 p-0.5">
+              <IconSymbol
+                size={28}
+                name="heart.fill"
+                color={color}
+              />
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="leaderboard"
         options={{
           title: 'Leaderboard',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="trophy.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Profile',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
         }}
       />
     </Tabs>
