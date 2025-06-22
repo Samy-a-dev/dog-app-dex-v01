@@ -12,6 +12,7 @@ A React Native app built with Expo that allows users to collect and discover dif
 - **Modern UI**: Gradient backgrounds, cards, and smooth animations
 - **Dog Collection**: Interface ready for collecting different dog breeds
 - **Profile Management**: User profile with stats and sign-out functionality
+- **Dog User Matching System**: Users can match together tinder style
 
 ## Setup Instructions
 
