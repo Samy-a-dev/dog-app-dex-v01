@@ -19,7 +19,7 @@ const { width } = Dimensions.get('window');
 const slides = [
   {
     id: '1',
-    title: 'Welcome to Bingo',
+    title: 'Welcome to Dogedex',
     description: 'Your adventure to collect and catalog dogs around the world begins here!',
     image: '🐕',
     backgroundColor: ['#FF6B6B', '#FF8E53'] as const,
