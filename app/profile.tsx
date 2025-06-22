@@ -167,12 +167,20 @@ export default function ProfileScreen() {
   };
 
   const confirmSignOut = () => {
+    console.log('[PROFILE DEBUG] confirmSignOut called');
     Alert.alert(
       'Sign Out',
       'Are you sure you want to sign out?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign Out', style: 'destructive', onPress: handleSignOut },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: () => {
+            console.log('[PROFILE DEBUG] "Sign Out" button in Alert pressed. Calling handleSignOut.');
+            handleSignOut();
+          }
+        },
       ]
     );
   };
