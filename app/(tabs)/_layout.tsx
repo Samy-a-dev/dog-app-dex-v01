@@ -62,11 +62,18 @@ export default function TabLayout() {
             <View className="flex items-center justify-center rounded-full bg-purple-100/10 p-0.5">
               <IconSymbol
                 size={28}
-                name="figure.walk" // Example icon, change as needed
+                name="heart.fill"
                 color={color}
               />
             </View>
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile" // This will look for app/(tabs)/profile.tsx
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
         }}
       />
     </Tabs>
