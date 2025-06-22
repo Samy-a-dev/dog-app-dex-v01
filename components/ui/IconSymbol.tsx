@@ -22,6 +22,7 @@ const MAPPING: IconMapping = {
   'camera.fill': 'camera-alt',
   'person.fill': 'person',
   'trophy.fill': 'emoji-events',
+  'figure.walk': 'directions-walk',
 };
 
 /**
