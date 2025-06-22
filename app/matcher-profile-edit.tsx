@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native'; // For platform-specific logic if needed for URI handling
+import { Buffer } from 'buffer'; // FUCKING ADD THIS IMPORT
 
 // Function to upload matcher dog image
 async function uploadMatcherDogImage(userId: string, imageUri: string): Promise<string | null> {
@@ -14,17 +15,44 @@ async function uploadMatcherDogImage(userId: string, imageUri: string): Promise<
   }
 
   try {
-    // Ensure correct URI format for fetch
-    const uriToFetch = Platform.OS === 'android' && !imageUri.startsWith('file://')
-      ? `file://${imageUri}`
-      : imageUri;
+    let blob: Blob;
+    let fileExtension: string;
+    let mimeType: string;
 
-    const response = await fetch(uriToFetch);
-    const blob = await response.blob();
+    if (imageUri.startsWith('data:')) {
+      // Handle base64 data URI (common from web image pickers after editing/cropping)
+      const byteString = Buffer.from(imageUri.split(',')[1], 'base64').toString('binary');
+      const ia = new Uint8Array(byteString.length);
+      for (let i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i);
+      }
+      const match = imageUri.match(/^data:(.*?);base64,/);
+      mimeType = match ? match[1] : 'image/jpeg';
+      blob = new Blob([ia], { type: mimeType });
+      fileExtension = mimeType.split('/')[1] || 'jpg';
+    } else {
+      // Handle file URI (common on native or direct file links)
+      const uriToFetch = Platform.OS === 'android' && !imageUri.startsWith('file://')
+        ? `file://${imageUri}`
+        : imageUri;
+      const response = await fetch(uriToFetch);
+      blob = await response.blob();
+      mimeType = blob.type || 'image/jpeg'; // Default if blob.type is empty
+      const extensionMatch = imageUri.split('.').pop()?.toLowerCase();
+      fileExtension = extensionMatch || (mimeType.startsWith('image/') ? mimeType.split('/')[1] : 'jpg');
 
-    const fileExtension = imageUri.split('.').pop()?.toLowerCase() || 'jpg';
+      // Ensure mimeType is sensible if derived from a potentially missing/wrong extension
+      if (!mimeType.startsWith('image/') && fileExtension) {
+        mimeType = `image/${fileExtension}`;
+      }
+    }
+    
+    if (!blob) {
+        throw new Error("Could not create blob from image URI");
+    }
+
     const fileName = `${userId}/${Date.now()}.${fileExtension}`;
-    const mimeType = blob.type || `image/${fileExtension}`;
+    console.log(`Uploading to Supabase: fileName='${fileName}', mimeType='${mimeType}', blob size=${blob.size}`);
 
     // IMPORTANT: Ensure 'matcher-dog-images' bucket exists in Supabase
     // and has RLS policies allowing authenticated users to upload to their own folder.
@@ -121,7 +149,7 @@ export default function MatcherProfileEditScreen() {
   const handlePickImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'], // Corrected to lowercase 'images'
         allowsEditing: true,
         aspect: [1, 1], // Square aspect ratio
         quality: 0.7, // Compress image slightly
@@ -184,6 +212,9 @@ export default function MatcherProfileEditScreen() {
 
   return (
     <ScrollView style={styles.container}>
+      <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.replace('/')} style={styles.backButton}>
+        <Text style={styles.backButtonText}>← Go Back</Text>
+      </TouchableOpacity>
       <Text style={styles.title}>Edit Matcher Profile</Text>
 
       <TouchableOpacity onPress={handlePickImage} style={styles.imagePicker}>
@@ -222,6 +253,17 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 20,
     textAlign: 'center',
+  },
+  backButton: {
+    position: 'absolute',
+    top: 10, // Adjust as needed for status bar height or SafeAreaView
+    left: 10,
+    zIndex: 1,
+    padding: 10,
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: '#FF6B6B', // Or your theme color
   },
   imagePicker: {
     width: '100%',
