@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Image, Dimensions, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Image, Dimensions, TouchableOpacity, Alert } from 'react-native';
 import Swiper from 'react-native-deck-swiper';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,6 +11,31 @@ interface ProfileCard {
   matcher_dog_image_url: string | null;
   matcher_bio: string | null;
 }
+
+interface RecordSwipeArgs {
+  p_target_user_id: string; // UUID
+  p_swipe_direction: 'like' | 'nope';
+}
+
+interface SwipeResponse {
+  status: 'match_created' | 'swipe_recorded' | 'error';
+  message: string;
+  swiper_user_id?: string; // UUID
+  target_user_id?: string; // UUID
+  swipe_type?: 'like' | 'nope';
+  matched_user_id?: string; // UUID, should be same as target_user_id in this context
+  matched_username?: string;
+  matched_dog_image_url?: string;
+}
+
+interface CreateOrGetChatRoomArgs {
+  p_user_id_1: string; // UUID
+  p_user_id_2: string; // UUID
+}
+
+// The RPC create_or_get_chat_room directly returns a UUID (string)
+// Supabase client might wrap this in { data: chatRoomId }
+// For simplicity in casting, we'll expect data to be string | null
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -81,27 +106,153 @@ export default function FindWalkersScreen() {
 
     console.log(`Swiped ${direction} on profile: ${swipedProfile.user_id} (username: ${swipedProfile.username})`);
 
+    let mappedDirection = 'nope'; // Default to nope
+    if (direction === 'right' || direction === 'top') { // Assuming top is also a like
+      mappedDirection = 'like';
+    } else if (direction === 'left' || direction === 'bottom') { // Assuming bottom is also a nope
+      mappedDirection = 'nope';
+    }
+
     try {
-      const { data: swipeResult, error: swipeError } = await supabase.rpc('record_swipe', {
+      // Explicitly type the expected response from the RPC
+      const args: RecordSwipeArgs = {
         p_target_user_id: swipedProfile.user_id,
-        p_swipe_direction: direction,
-      });
+        p_swipe_direction: mappedDirection as 'like' | 'nope', // Ensure mappedDirection fits the type
+      };
+      
+      // Call RPC without generics, then cast the data part
+      const { data, error: swipeError } = await supabase.rpc(
+        'record_swipe',
+        args
+      );
+      const swipeResult = data as SwipeResponse | null;
 
       if (swipeError) {
-        console.error('Error recording swipe:', swipeError);
-        // Optionally, inform the user or try to re-queue the swipe
-        return; // Stop further processing for this swipe if RPC failed
+        console.error('Error recording swipe (network/postgres level):', swipeError);
+        Alert.alert('Swipe Error', `Could not record swipe: ${swipeError.message}`);
+        return;
       }
 
-      console.log('Swipe recorded successfully:', swipeResult);
+      console.log('RPC call successful, result:', swipeResult);
 
-      // In Phase 3, swipeResult will contain match information.
-      // For now, it returns: {status: 'swipe_recorded', target_user_id: ..., swipe_type: ...}
-      // Example: if (swipeResult.matched) { Alert.alert("It's a Match!", `You matched with ${swipedProfile.username}`); }
+      if (swipeResult && swipeResult.status === 'match_created') {
+        const matchedUsername = swipeResult.matched_username || swipedProfile.username || 'a fellow dog lover';
+        Alert.alert(
+          "It's a Match!",
+          `You and ${matchedUsername} are now buddies! Taking you to chat...`,
+          [{
+            text: 'Go to Chat',
+            onPress: async () => {
+              if (!user || !swipeResult.matched_user_id) {
+                Alert.alert("Error", "Could not initiate chat. User details missing.");
+                return;
+              }
+              try {
+                const chatRoomArgs: CreateOrGetChatRoomArgs = {
+                  p_user_id_1: user.id,
+                  p_user_id_2: swipeResult.matched_user_id,
+                };
+                console.log('Calling create_or_get_chat_room with:', chatRoomArgs);
+                const { data: chatRoomId, error: chatRoomError } = await supabase.rpc(
+                  'create_or_get_chat_room',
+                  chatRoomArgs
+                );
+                const actualChatRoomId = chatRoomId as string | null; // RPC returns UUID directly
+
+                if (chatRoomError) {
+                  console.error('Error creating or getting chat room:', chatRoomError);
+                  Alert.alert('Chat Error', `Could not open chat: ${chatRoomError.message}`);
+                  return;
+                }
+
+                if (actualChatRoomId) {
+                  console.log('Obtained chat_room_id:', actualChatRoomId);
+                  // Navigate to the chat screen using object syntax for typed routes
+                  router.push({
+                    pathname: '/chat/[chatRoomId]', // Path to the dynamic route file
+                    params: { chatRoomId: actualChatRoomId, matchedUserName: matchedUsername },
+                  });
+                } else {
+                  Alert.alert('Chat Error', 'Could not retrieve chat room ID.');
+                }
+              } catch (e: any) {
+                console.error('Exception calling create_or_get_chat_room:', e);
+                Alert.alert('Chat Error', 'An unexpected error occurred while trying to start the chat.');
+              }
+            }
+          }]
+        );
+      } else if (swipeResult && swipeResult.status === 'error') {
+        console.error('Error from record_swipe RPC logic:', swipeResult.message);
+        Alert.alert('Swipe Error', swipeResult.message || 'An issue occurred while processing your swipe.');
+      } else if (swipeResult && swipeResult.status === 'swipe_recorded') {
+        console.log('Swipe recorded, no match yet. Details:', swipeResult);
+      } else {
+        // This case should ideally not be reached if the RPC always returns a valid structure
+        console.warn('Unexpected swipe result structure:', swipeResult);
+      }
 
     } catch (e: any) {
       console.error('Exception calling record_swipe:', e);
+      Alert.alert('Swipe Failed', 'An unexpected error occurred. Please try again.');
     }
+  };
+
+  const handleForceMatch = async () => {
+    if (!user) {
+      Alert.alert("Not Logged In", "You need to be logged in to force a match.");
+      return;
+    }
+    if (profiles.length === 0) {
+      Alert.alert("No Profiles", "No profiles available to force a match with.");
+      return;
+    }
+
+    const targetProfile = profiles[0]; // Match with the first available profile
+    const targetUsername = targetProfile.username || 'Demo User';
+
+    Alert.alert(
+      "Forcing Demo Match",
+      `Attempting to match you with ${targetUsername}. This will take you to chat.`,
+      [{
+        text: 'Proceed',
+        onPress: async () => {
+          try {
+            const chatRoomArgs: CreateOrGetChatRoomArgs = {
+              p_user_id_1: user.id,
+              p_user_id_2: targetProfile.user_id,
+            };
+            console.log('[FORCE MATCH] Calling create_or_get_chat_room with:', chatRoomArgs);
+            const { data: chatRoomId, error: chatRoomError } = await supabase.rpc(
+              'create_or_get_chat_room',
+              chatRoomArgs
+            );
+            const actualChatRoomId = chatRoomId as string | null;
+
+            if (chatRoomError) {
+              console.error('[FORCE MATCH] Error creating or getting chat room:', chatRoomError);
+              Alert.alert('Chat Error', `Could not open chat: ${chatRoomError.message}`);
+              return;
+            }
+
+            if (actualChatRoomId) {
+              console.log('[FORCE MATCH] Obtained chat_room_id:', actualChatRoomId);
+              router.push({
+                pathname: '/chat/[chatRoomId]',
+                params: { chatRoomId: actualChatRoomId, matchedUserName: targetUsername },
+              });
+            } else {
+              Alert.alert('Chat Error', 'Could not retrieve chat room ID for forced match.');
+            }
+          } catch (e: any) {
+            console.error('[FORCE MATCH] Exception:', e);
+            Alert.alert('Chat Error', 'An unexpected error occurred while trying to force the match.');
+          }
+        }
+      },
+      { text: 'Cancel', style: 'cancel' }
+      ]
+    );
   };
 
   const onSwipedAll = () => {
@@ -210,6 +361,13 @@ export default function FindWalkersScreen() {
                 <Text style={styles.swipeButtonText}>LIKE</Text>
             </TouchableOpacity>
         </View>
+      )}
+
+      {/* Temporary button for forcing a match */}
+      {profiles.length > 0 && (
+        <TouchableOpacity onPress={handleForceMatch} style={styles.forceMatchButton}>
+          <Text style={styles.forceMatchButtonText}>Force Match w/ First Profile (Demo)</Text>
+        </TouchableOpacity>
       )}
     </View>
   );
@@ -320,6 +478,18 @@ const styles = StyleSheet.create({
   refreshButtonText: {
     color: 'white',
     fontSize: 16,
+  },
+  forceMatchButton: {
+    backgroundColor: 'purple',
+    padding: 10,
+    borderRadius: 5,
+    marginHorizontal: 20,
+    marginVertical: 10,
+    alignItems: 'center',
+  },
+  forceMatchButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
   overlayLabelNope: {
     fontSize: 45,
