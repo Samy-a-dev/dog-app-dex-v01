@@ -108,7 +108,6 @@ export default function HomeScreen() {
           accessibilityLabel="Dogedex logo" // Add accessibility label
         />
       </View>
-
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.welcomeCard}>
           <Text style={styles.cardTitle}>Welcome to Dogedex!</Text>
@@ -116,9 +115,8 @@ export default function HomeScreen() {
             Start your journey to discover and collect different dog breeds from around the world.
           </Text>
         </View>
-
         <XPDisplayCard /> {/* Added XP Display Card */}
-{/* Explore Breeds Section */}
+        {/* Explore Breeds Section */}
         <View style={styles.exploreBreedsContainer}>
           <View style={styles.exploreHeader}>
             <Text style={styles.exploreTitle}>Explore Breeds</Text>
@@ -132,30 +130,31 @@ export default function HomeScreen() {
             <Text style={styles.errorText}>{error}</Text>
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.exploreList}>
-              {exploreBreedsData.map(breed => (
-                <TouchableOpacity
-                  key={breed.id}
-                  style={styles.exploreBreedCardTouchable} // Using a separate style for the touchable if needed, or reuse exploreBreedCard
-                  onPress={() => {
-                    if (breed.reference_image_id) {
-                      router.push(`/breed/${breed.reference_image_id}`);
-                    } else {
-                      console.warn("Missing reference_image_id for breed on home screen:", breed.name);
-                      // Optionally, alert the user or disable interaction
-                    }
-                  }}
-                >
-                  <View style={[styles.exploreBreedCard, { backgroundColor: breed.backgroundColor }]}>
-                    <Image source={{ uri: breed.image_url }} style={styles.breedImage} />
-                    <Text style={styles.breedPrimaryName} numberOfLines={1} ellipsizeMode="tail">{breed.name}</Text>
-                    {breed.breed_group && <Text style={styles.breedSecondaryName} numberOfLines={1} ellipsizeMode="tail">{breed.breed_group}</Text>}
-                  </View>
-                </TouchableOpacity>
-              ))}
+              {exploreBreedsData.map(breed => {
+                return (
+                  <TouchableOpacity
+                    key={breed.id}
+                    style={styles.exploreBreedCardTouchable} // Using a separate style for the touchable if needed, or reuse exploreBreedCard
+                    onPress={() => {
+                      if (breed.reference_image_id) {
+                        router.push(`/breed/${breed.reference_image_id}`);
+                      } else {
+                        console.warn("Missing reference_image_id for breed on home screen:", breed.name);
+                        // Optionally, alert the user or disable interaction
+                      }
+                    }}
+                  >
+                    <View style={[styles.exploreBreedCard, { backgroundColor: breed.backgroundColor }]}>
+                      <Image source={{ uri: breed.image_url }} style={styles.breedImage} />
+                      <Text style={styles.breedPrimaryName} numberOfLines={1} ellipsizeMode="tail">{breed.name}</Text>
+                      {breed.breed_group ? <Text style={styles.breedSecondaryName} numberOfLines={1} ellipsizeMode="tail">{breed.breed_group}</Text> : null}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
           )}
         </View>
-
       </ScrollView>
     </SafeAreaView>
   );
