@@ -4,8 +4,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { Platform } from 'react-native'; // For platform-specific logic if needed for URI handling
-import { Buffer } from 'buffer'; // FUCKING ADD THIS IMPORT
+import { Platform } from 'react-native';
+import { Buffer } from 'buffer';
 
 // Function to upload matcher dog image
 async function uploadMatcherDogImage(userId: string, imageUri: string): Promise<string | null> {
@@ -37,11 +37,9 @@ async function uploadMatcherDogImage(userId: string, imageUri: string): Promise<
         : imageUri;
       const response = await fetch(uriToFetch);
       blob = await response.blob();
-      mimeType = blob.type || 'image/jpeg'; // Default if blob.type is empty
+      mimeType = blob.type || 'image/jpeg'; 
       const extensionMatch = imageUri.split('.').pop()?.toLowerCase();
       fileExtension = extensionMatch || (mimeType.startsWith('image/') ? mimeType.split('/')[1] : 'jpg');
-
-      // Ensure mimeType is sensible if derived from a potentially missing/wrong extension
       if (!mimeType.startsWith('image/') && fileExtension) {
         mimeType = `image/${fileExtension}`;
       }
@@ -54,15 +52,11 @@ async function uploadMatcherDogImage(userId: string, imageUri: string): Promise<
     const fileName = `${userId}/${Date.now()}.${fileExtension}`;
     console.log(`Uploading to Supabase: fileName='${fileName}', mimeType='${mimeType}', blob size=${blob.size}`);
 
-    // IMPORTANT: Ensure 'matcher-dog-images' bucket exists in Supabase
-    // and has RLS policies allowing authenticated users to upload to their own folder.
-    // Example RLS (insert): auth.uid()::text = (storage.foldername(name))[1]
-    // Example RLS (select): public read or auth.uid()::text = (storage.foldername(name))[1]
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('matcher-dog-images')
       .upload(fileName, blob, {
         cacheControl: '3600',
-        upsert: false, // Set to true to overwrite, false to error if file exists
+        upsert: false,
         contentType: mimeType,
       });
 
@@ -96,6 +90,7 @@ async function uploadMatcherDogImage(userId: string, imageUri: string): Promise<
 export default function MatcherProfileEditScreen() {
   const { user } = useAuth();
   const router = useRouter();
+  const [username, setUsername] = useState<string>(''); // ADDED
   const [dogImageUrl, setDogImageUrl] = useState<string | null>(null);
   const [bio, setBio] = useState<string>('');
   const [loading, setLoading] = useState(true);
@@ -104,7 +99,7 @@ export default function MatcherProfileEditScreen() {
 
   useEffect(() => {
     if (!user) {
-      router.replace('/auth'); // Redirect if not logged in
+      router.replace('/auth'); 
       return;
     }
 
@@ -123,16 +118,17 @@ export default function MatcherProfileEditScreen() {
       try {
         const { data, error } = await supabase
           .from('user_profiles')
-          .select('matcher_dog_image_url, matcher_bio')
+          .select('username, matcher_dog_image_url, matcher_bio') // ADDED username
           .eq('user_id', user.id)
           .single();
 
-        if (error && error.code !== 'PGRST116') { // PGRST116: 0 rows
+        if (error && error.code !== 'PGRST116') { 
           throw error;
         }
         if (data) {
+          setUsername(data.username || ''); // ADDED
           setDogImageUrl(data.matcher_dog_image_url);
-          setSelectedImageUri(data.matcher_dog_image_url); // For display
+          setSelectedImageUri(data.matcher_dog_image_url); 
           setBio(data.matcher_bio || '');
         }
       } catch (error) {
@@ -149,16 +145,14 @@ export default function MatcherProfileEditScreen() {
   const handlePickImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'], // Corrected to lowercase 'images'
+        mediaTypes: ['images'], 
         allowsEditing: true,
-        aspect: [1, 1], // Square aspect ratio
-        quality: 0.7, // Compress image slightly
+        aspect: [1, 1], 
+        quality: 0.7, 
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         setSelectedImageUri(result.assets[0].uri);
-        // No need to setDogImageUrl(null) here, as the actual URL is only confirmed after upload.
-        // The selectedImageUri will be used for the upload attempt.
       }
     } catch (error) {
       console.error("Error picking image: ", error);
@@ -168,12 +162,15 @@ export default function MatcherProfileEditScreen() {
 
   const handleSave = async () => {
     if (!user) return;
+    if (!username.trim()) { // FUCKING VALIDATE USERNAME
+      Alert.alert('Username Required', 'Please enter a username.');
+      return;
+    }
     setSaving(true);
 
     let finalDogImageUrl = dogImageUrl;
 
     if (selectedImageUri && selectedImageUri !== dogImageUrl) {
-      // New image was selected or current image is local URI
       const uploadedUrl = await uploadMatcherDogImage(user.id, selectedImageUri);
       if (uploadedUrl) {
         finalDogImageUrl = uploadedUrl;
@@ -188,6 +185,7 @@ export default function MatcherProfileEditScreen() {
       const { error } = await supabase
         .from('user_profiles')
         .update({
+          username: username.trim(), // ADDED username
           matcher_dog_image_url: finalDogImageUrl,
           matcher_bio: bio,
         })
@@ -196,8 +194,8 @@ export default function MatcherProfileEditScreen() {
       if (error) throw error;
 
       Alert.alert('Success', 'Matcher profile updated!');
-      setDogImageUrl(finalDogImageUrl); // Update state with the potentially new URL
-      router.back(); // Go back to the previous screen (e.g., profile)
+      setDogImageUrl(finalDogImageUrl); 
+      router.back(); 
     } catch (error) {
       console.error('Error saving matcher profile:', error);
       Alert.alert('Error', 'Could not save your matcher profile.');
@@ -221,9 +219,18 @@ export default function MatcherProfileEditScreen() {
         {selectedImageUri ? (
           <Image source={{ uri: selectedImageUri }} style={styles.dogImage} />
         ) : (
-          <Text style={styles.imagePickerText}>Tap to select Dog&amp;apos;s Image</Text>
+          <Text style={styles.imagePickerText}>Tap to select Dog&apos;s Image</Text>
         )}
       </TouchableOpacity>
+
+      <Text style={styles.label}>Your Username:</Text>
+      <TextInput
+        value={username}
+        onChangeText={setUsername}
+        placeholder="Enter your username"
+        style={styles.textInputUsername}
+        autoCapitalize="none"
+      />
 
       <Text style={styles.label}>Your Bio for Dog Matching:</Text>
       <TextInput
@@ -256,14 +263,14 @@ const styles = StyleSheet.create({
   },
   backButton: {
     position: 'absolute',
-    top: 10, // Adjust as needed for status bar height or SafeAreaView
+    top: 10, 
     left: 10,
     zIndex: 1,
     padding: 10,
   },
   backButtonText: {
     fontSize: 16,
-    color: '#FF6B6B', // Or your theme color
+    color: '#FF6B6B', 
   },
   imagePicker: {
     width: '100%',
@@ -288,6 +295,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 8,
     color: '#333',
+  },
+  textInputUsername: { 
+    borderWidth: 1,
+    borderColor: '#CCC',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 20,
+    fontSize: 16,
+    backgroundColor: 'white',
   },
   textInput: {
     borderWidth: 1,
