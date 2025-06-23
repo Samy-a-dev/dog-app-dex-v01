@@ -152,17 +152,33 @@ export default function ProfileScreen() {
   };
 
   const handleSignOut = async () => {
+    console.log("[SIGN_OUT_DEBUG] handleSignOut called");
+    setIsSigningOut(true);
     try {
-      console.log("Starting sign out process...");
-      setIsSigningOut(true);
+      console.log("[SIGN_OUT_DEBUG] Attempting to clear onboarding status...");
       await clearHasSeenOnboarding();
+      console.log("[SIGN_OUT_DEBUG] Onboarding status cleared successfully.");
+
+      console.log("[SIGN_OUT_DEBUG] Attempting to sign out user...");
+      // Log user state before sign out
+      console.log("[SIGN_OUT_DEBUG] User state before signOut():", user ? user.id : 'null');
       await signOut();
-      console.log("Sign out completed, effect should redirect now");
-      // The useEffect will handle the redirection.
+      // Log user state after sign out attempt - user should be null here if successful
+      // Note: The user object from this component's scope might not update immediately.
+      // The AuthContext's state change will trigger re-renders.
+      console.log("[SIGN_OUT_DEBUG] signOut() call completed.");
+      console.log("[SIGN_OUT_DEBUG] Sign out process finished in try block. Expecting redirect via useEffect.");
+      // The useEffect in AuthProvider or navigation listeners should handle redirection.
     } catch (error) {
-      setIsSigningOut(false); // Reset on error
-      console.error('Sign out error:', error);
+      console.error('[SIGN_OUT_DEBUG] Error during sign out process:', error);
       Alert.alert('Error', 'Failed to sign out. Please try again.');
+    } finally {
+      // It's important to set isSigningOut to false only after navigation or if an error occurs.
+      // If navigation happens due to user state change, this component might unmount.
+      // For now, let's keep it simple and reset it here, but ideally, this is handled carefully
+      // depending on navigation flow.
+      console.log("[SIGN_OUT_DEBUG] Resetting isSigningOut state in finally block.");
+      setIsSigningOut(false);
     }
   };
 
@@ -243,10 +259,10 @@ export default function ProfileScreen() {
 
         <TouchableOpacity
           style={styles.signOutButton}
-          onPress={confirmSignOut}
+          onPress={handleSignOut} // Changed from confirmSignOut to handleSignOut
           activeOpacity={0.7}
         >
-          <Text style={styles.signOutText}>Sign Out</Text>
+          <Text style={styles.signOutText}>Sign Out (No Confirmation)</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
