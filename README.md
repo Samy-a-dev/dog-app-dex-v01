@@ -1,3 +1,5 @@
+https://dog-app-dex-v01--t1cuse1x8s.expo.app  updated demo link, no changes were made to the aplication just may have sent an old link into submition 
+
 # Bingo Dog Collector App 🐕
 
 A React Native app built with Expo that allows users to collect and discover different dog breeds. Features authentication with Supabase and a beautiful UI inspired by modern mobile design patterns.
@@ -12,6 +14,7 @@ A React Native app built with Expo that allows users to collect and discover dif
 - **Modern UI**: Gradient backgrounds, cards, and smooth animations
 - **Dog Collection**: Interface ready for collecting different dog breeds
 - **Profile Management**: User profile with stats and sign-out functionality
+- **Dog User Matching System**: Users can match together tinder style
 
 ## Setup Instructions
 
