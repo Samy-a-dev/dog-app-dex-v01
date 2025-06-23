@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,12 +9,14 @@ import {
   Dimensions,
   Platform,
   Image,
-  ActivityIndicator, // Added
-  useWindowDimensions
+  ActivityIndicator,
+  Animated,
 } from 'react-native';
-import { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+
+import { createShadowStyle } from '@/utils/shadowStyles';
+import XPDisplayCard from '@/components/XPDisplayCard';
 
 // TODO: Move this API key to a .env file for security
 const DOG_API_KEY = 'live_jwnKEXgZxbyQwUMZy1yCL3uZ53Qglc8OMUewDlEM5r8ypWH5NDqmYvwVJYr4IqGY';
@@ -30,21 +32,20 @@ interface Breed {
   backgroundColor: string;
   reference_image_id?: string; // Added for navigation to detail screen
 }
-import { useAuth } from '@/contexts/AuthContext';
-import { createShadowStyle } from '@/utils/shadowStyles';
-import XPDisplayCard from '@/components/XPDisplayCard'; // Added import
-import { IconSymbol } from '@/components/ui/IconSymbol'; // Added import
 
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen() {
-  const { user } = useAuth();
   const router = useRouter();
-  const { width: screenWidth } = useWindowDimensions();
-  const logoWidth = Math.min(screenWidth * 0.65, 240); // Responsive width with max size
   const [exploreBreedsData, setExploreBreedsData] = useState<Breed[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Animation refs
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  const logoScale = useRef(new Animated.Value(0.8)).current;
+  const cardsAnimation = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const fetchBreeds = async () => {
@@ -74,6 +75,13 @@ export default function HomeScreen() {
           reference_image_id: breed.reference_image_id, // Added
         }));
         setExploreBreedsData(formattedBreeds);
+        
+        // Animate cards after data loads
+        Animated.timing(cardsAnimation, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }).start();
       } catch (e: any) {
         console.error("Failed to fetch breeds:", e);
         setError(e.message || 'Failed to fetch breeds. Please try again later.');
@@ -83,7 +91,29 @@ export default function HomeScreen() {
     };
 
     fetchBreeds();
-  }, []);
+  }, [cardsAnimation]);
+
+  useEffect(() => {
+    // Initial animations
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.spring(logoScale, {
+        toValue: 1,
+        tension: 50,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [fadeAnim, slideAnim, logoScale]);
 
   const handleSeeAll = () => {
     router.push('/searchBreeds');
@@ -94,293 +124,220 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={{
-        paddingTop: 20,
-        paddingBottom: 15,
-        paddingHorizontal: 10,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center', // Center the logo
-      }}>
-        <Image 
-          source={require('@/assets/images/company-logo-name.png')} 
-          style={{
-            width: logoWidth,
-            height: logoWidth * 0.4, // Maintain aspect ratio
-            alignSelf: 'center',
-          }}
-          resizeMode="contain"
-          accessibilityLabel="Dogedex logo" // Add accessibility label
-        />
-        <TouchableOpacity 
-          style={styles.profileButton}
-          onPress={handleProfilePress}
+    <LinearGradient
+      colors={['#667eea', '#764ba2']}
+      style={styles.container}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+    >
+      <SafeAreaView style={styles.safeArea}>
+        {/* Header */}
+        <Animated.View 
+          style={[
+            styles.header,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            }
+          ]}
         >
-          <LinearGradient
-            colors={['#FF6B6B', '#FF8E53']}
-            style={styles.profileButtonGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
+          <Animated.View
+            style={{
+              transform: [{ scale: logoScale }],
+            }}
           >
-            <Text style={styles.profileButtonText}>👤</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      </View>
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.welcomeCard}>
-          <Text style={styles.cardTitle}>Welcome to Dogedex!</Text>
-          <Text style={styles.cardDescription}>
-            Start your journey to discover and collect different dog breeds from around the world.
-          </Text>
-        </View>
-        <XPDisplayCard /> {/* Added XP Display Card */}
-        {/* Explore Breeds Section */}
-        <View style={styles.exploreBreedsContainer}>
-          <View style={styles.exploreHeader}>
-            <Text style={styles.exploreTitle}>Explore Breeds</Text>
-            <TouchableOpacity onPress={handleSeeAll}>
-              <Text style={styles.seeAllText}>See All &gt;</Text>
-            </TouchableOpacity>
-          </View>
-          {isLoading ? (
-            <ActivityIndicator size="large" color="#FF6B6B" style={styles.loader} />
-          ) : error ? (
-            <Text style={styles.errorText}>{error}</Text>
-          ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.exploreList}>
-              {exploreBreedsData.map(breed => {
-                return (
-                  <TouchableOpacity
-                    key={breed.id}
-                    style={styles.exploreBreedCardTouchable} // Using a separate style for the touchable if needed, or reuse exploreBreedCard
-                    onPress={() => {
-                      if (breed.reference_image_id) {
-                        router.push(`/breed/${breed.reference_image_id}`);
-                      } else {
-                        console.warn("Missing reference_image_id for breed on home screen:", breed.name);
-                        // Optionally, alert the user or disable interaction
-                      }
-                    }}
-                  >
-                    <View style={[styles.exploreBreedCard, { backgroundColor: breed.backgroundColor }]}>
-                      <Image source={{ uri: breed.image_url }} style={styles.breedImage} />
-                      <Text style={styles.breedPrimaryName} numberOfLines={1} ellipsizeMode="tail">{breed.name}</Text>
-                      {breed.breed_group ? <Text style={styles.breedSecondaryName} numberOfLines={1} ellipsizeMode="tail">{breed.breed_group}</Text> : null}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          )}
-        </View>
-      </ScrollView>
-      
-      {/* Floating Camera Button */}
-      <TouchableOpacity 
-        style={styles.floatingCameraButton}
-        onPress={() => router.push('/camera')}
-        activeOpacity={0.8}
-      >
-        <LinearGradient
-          colors={['#8B5CF6', '#A855F7']}
-          style={styles.floatingCameraButtonGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+            <Image 
+              source={require('@/assets/images/company-logo-name.png')} 
+              style={styles.logo}
+              resizeMode="contain"
+              accessibilityLabel="Dogedex logo"
+            />
+          </Animated.View>
+          
+          <TouchableOpacity 
+            style={styles.profileButton}
+            onPress={handleProfilePress}
+          >
+            <LinearGradient
+              colors={['rgba(255, 255, 255, 0.95)', 'rgba(255, 255, 255, 0.85)']}
+              style={styles.profileButtonGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <Text style={styles.profileButtonText}>👤</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* Content */}
+        <ScrollView 
+          style={styles.content} 
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
         >
-          <IconSymbol 
-            name="camera.fill" 
-            size={28} 
-            color="white" 
-          />
-        </LinearGradient>
-      </TouchableOpacity>
-    </SafeAreaView>
+          {/* Welcome Card */}
+          <Animated.View 
+            style={[
+              styles.welcomeCard,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+              }
+            ]}
+          >
+            <LinearGradient
+              colors={['rgba(255, 255, 255, 0.95)', 'rgba(255, 255, 255, 0.85)']}
+              style={styles.welcomeCardGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <Text style={styles.cardTitle}>Welcome to Dogedex! 🐕</Text>
+              <Text style={styles.cardDescription}>
+                Start your journey to discover and collect different dog breeds from around the world.
+              </Text>
+            </LinearGradient>
+          </Animated.View>
+
+          {/* XP Display Card */}
+          <Animated.View
+            style={{
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            }}
+          >
+            <XPDisplayCard />
+          </Animated.View>
+
+          {/* Explore Breeds Section */}
+          <Animated.View 
+            style={[
+              styles.exploreBreedsContainer,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+              }
+            ]}
+          >
+            <View style={styles.exploreHeader}>
+              <Text style={styles.exploreTitle}>Explore Breeds ✨</Text>
+              <TouchableOpacity onPress={handleSeeAll} style={styles.seeAllButton}>
+                <LinearGradient
+                  colors={['rgba(255, 255, 255, 0.2)', 'rgba(255, 255, 255, 0.1)']}
+                  style={styles.seeAllGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                >
+                  <Text style={styles.seeAllText}>See All →</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+            
+            {isLoading ? (
+              <View style={styles.loader}>
+                <ActivityIndicator size="large" color="rgba(255, 255, 255, 0.8)" />
+                <Text style={styles.loadingText}>Fetching adorable breeds...</Text>
+              </View>
+            ) : error ? (
+              <Text style={styles.errorText}>{error}</Text>
+            ) : (
+              <Animated.ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={[
+                  styles.exploreList,
+                  {
+                    opacity: cardsAnimation,
+                    transform: [
+                      {
+                        translateX: cardsAnimation.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [50, 0],
+                        }),
+                      },
+                    ],
+                  }
+                ]}
+                contentContainerStyle={styles.exploreListContent}
+              >
+                {exploreBreedsData.map((breed, index) => (
+                  <Animated.View
+                    key={breed.id}
+                    style={[
+                      styles.exploreBreedCardTouchable,
+                      {
+                        transform: [
+                          {
+                            scale: cardsAnimation.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [0.8, 1],
+                            }),
+                          },
+                        ],
+                      }
+                    ]}
+                  >
+                    <TouchableOpacity
+                      onPress={() => router.push('/searchBreeds')}
+                      activeOpacity={0.8}
+                      style={{ flex: 1 }}
+                    >
+                      <LinearGradient
+                        colors={['rgba(255, 255, 255, 0.9)', 'rgba(255, 255, 255, 0.7)']}
+                        style={styles.exploreBreedCard}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                      >
+                        <Image
+                          source={{ uri: breed.image_url }}
+                          style={styles.breedImage}
+                          resizeMode="cover"
+                        />
+                        <View style={styles.breedInfo}>
+                          <Text style={styles.breedPrimaryName} numberOfLines={1}>
+                            {breed.name}
+                          </Text>
+                          {breed.breed_group && (
+                            <Text style={styles.breedSecondaryName} numberOfLines={1}>
+                              {breed.breed_group}
+                            </Text>
+                          )}
+                        </View>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  </Animated.View>
+                ))}
+              </Animated.ScrollView>
+            )}
+          </Animated.View>
+        </ScrollView>
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+  },
+  safeArea: {
+    flex: 1,
   },
   header: {
     paddingTop: 20,
     paddingBottom: 15,
-    paddingHorizontal: 10,
+    paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   logo: {
-    width: 180,
-    height: 60,
+    width: width * 0.5,
+    height: width * 0.2,
   },
   profileButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    overflow: 'hidden',
-    ...createShadowStyle({
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.2,
-      shadowRadius: 4,
-      elevation: 5,
-    }),
-  },
-  profileButtonGradient: {
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  profileButtonText: {
-    fontSize: 24,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  welcomeCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    marginTop: 20,
-    marginBottom: 20,
-    ...createShadowStyle({
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
-    }),
-  },
-  cardTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
-  },
-  cardDescription: {
-    fontSize: 16,
-    color: '#666',
-    lineHeight: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 16,
-  },
-exploreBreedsContainer: {
-    marginTop: 20,
-    marginBottom: 20,
-  },
-  exploreHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-    paddingHorizontal: 5, // Slight horizontal padding for the header
-  },
-  exploreTitle: {
-    fontSize: 22, // Slightly larger than sectionTitle
-    fontWeight: 'bold',
-    color: '#2c3e50', // Darker, more prominent color
-  },
-  seeAllText: {
-    fontSize: 16,
-    color: '#3498db', // A distinct color for links
-    fontWeight: '600',
-  },
-  loader: {
-    marginTop: 20,
-    marginBottom: 20,
-  },
-  errorText: {
-    textAlign: 'center',
-    color: 'red',
-    marginTop: 20,
-    marginBottom: 20,
-    paddingHorizontal: 20,
-  },
-  exploreList: {
-    paddingLeft: 5, // Start cards slightly indented
-    paddingRight: 15, // Ensure last card has some space
-  },
-exploreBreedCardTouchable: {
-    // Ensures the touchable area matches the card's visual dimensions and layout needs
-    width: width * 0.35,
-    height: width * 0.45,
-    marginRight: 15,
-    borderRadius: 12, // Match card's border radius for consistent touch feedback
-    // Note: backgroundColor and shadow are applied to the inner View (exploreBreedCard)
-  },
-  exploreBreedCard: {
-    width: width * 0.35, // Adjust card width to show ~2.5 cards
-    height: width * 0.45, // Adjust height to be a bit taller
-    borderRadius: 12,
-    marginRight: 15,
-    padding: 10,
-    justifyContent: 'space-between', // Distribute space for image and text
-    ...createShadowStyle({
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 3 },
-      shadowOpacity: 0.15,
-      shadowRadius: 5,
-      elevation: 4,
-    }),
-  },
-  breedImage: {
-    width: '100%',
-    height: '60%', // Image takes up more space
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  breedPrimaryName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    textAlign: 'center',
-  },
-  breedSecondaryName: {
-    fontSize: 13,
-    fontWeight: 'bold', // Make it bold as per design
-    color: '#555',
-    textAlign: 'center',
-    marginTop: 2,
-  },
-  leaderboardButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    overflow: 'hidden',
-    marginLeft: 16,
-    ...createShadowStyle({
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.2,
-      shadowRadius: 4,
-      elevation: 5,
-    }),
-  },
-  leaderboardButtonGradient: {
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  leaderboardButtonText: {
-    fontSize: 24,
-  },
-  floatingCameraButton: {
-    position: 'absolute',
-    bottom: 90, // Position above the tab bar
-    right: 20,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
     overflow: 'hidden',
     ...createShadowStyle({
       shadowColor: '#000',
@@ -390,10 +347,144 @@ exploreBreedCardTouchable: {
       elevation: 8,
     }),
   },
-  floatingCameraButtonGradient: {
+  profileButtonGradient: {
     width: '100%',
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  profileButtonText: {
+    fontSize: 20,
+  },
+  content: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 120,
+  },
+  welcomeCard: {
+    borderRadius: 20,
+    marginBottom: 20,
+    overflow: 'hidden',
+    ...createShadowStyle({
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.15,
+      shadowRadius: 16,
+      elevation: 8,
+    }),
+  },
+  welcomeCardGradient: {
+    padding: 24,
+  },
+  cardTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  cardDescription: {
+    fontSize: 16,
+    color: '#34495e',
+    lineHeight: 24,
+    textAlign: 'center',
+  },
+  exploreBreedsContainer: {
+    marginTop: 20,
+    marginBottom: 20,
+  },
+  exploreHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  exploreTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: 'white',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  seeAllButton: {
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  seeAllGradient: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  seeAllText: {
+    fontSize: 16,
+    color: 'white',
+    fontWeight: '600',
+  },
+  loader: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginTop: 12,
+    fontSize: 16,
+  },
+  errorText: {
+    textAlign: 'center',
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginTop: 20,
+    marginBottom: 20,
+    paddingHorizontal: 20,
+    fontSize: 16,
+  },
+  exploreList: {
+    marginHorizontal: -5,
+  },
+  exploreListContent: {
+    paddingHorizontal: 5,
+    paddingBottom: 10,
+  },
+  exploreBreedCardTouchable: {
+    width: width * 0.65,
+    height: width * 0.8,
+    marginRight: 15,
+  },
+  exploreBreedCard: {
+    flex: 1,
+    borderRadius: 16,
+    padding: 12,
+    ...createShadowStyle({
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.15,
+      shadowRadius: 16,
+      elevation: 8,
+    }),
+  },
+  breedImage: {
+    width: '100%',
+    height: '75%',
+    borderRadius: 12,
+    marginBottom: 8,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+  },
+  breedInfo: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  breedPrimaryName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#2c3e50',
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  breedSecondaryName: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#7f8c8d',
+    textAlign: 'center',
   },
 });

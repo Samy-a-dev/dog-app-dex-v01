@@ -24,9 +24,10 @@ interface DogStats {
 
 interface Props {
   onBreedDetected?: (breed: string, funFact?: string, likeness?: number, location?: LocationData) => void;
+  onScanStart?: () => void;
 }
 
-export default function DogBreedCamera({ onBreedDetected }: Props) {
+export default function DogBreedCamera({ onBreedDetected, onScanStart }: Props) {
   const { user } = useAuth(); // Get the authenticated user
   const [photo, setPhoto] = useState<string | null>(null);
   const [breed, setBreed] = useState<string | null>(null);
@@ -293,6 +294,10 @@ export default function DogBreedCamera({ onBreedDetected }: Props) {
     setSaveStatus(null); // Clear previous save status
     setShowSaveButton(false); // Hide save button while processing
     setIsSaved(false); // Reset saved status
+
+    if (onScanStart) {
+      onScanStart();
+    }
 
     try {
       console.log('Initializing Gemini API...');

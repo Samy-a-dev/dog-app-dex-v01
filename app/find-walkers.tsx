@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Image, Dimensions, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Image, Dimensions, TouchableOpacity, Alert, Animated, SafeAreaView } from 'react-native';
 import Swiper from 'react-native-deck-swiper';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
@@ -13,31 +15,27 @@ interface ProfileCard {
 }
 
 interface RecordSwipeArgs {
-  p_target_user_id: string; // UUID
+  p_target_user_id: string;
   p_swipe_direction: 'like' | 'nope';
 }
 
 interface SwipeResponse {
   status: 'match_created' | 'swipe_recorded' | 'error';
   message: string;
-  swiper_user_id?: string; // UUID
-  target_user_id?: string; // UUID
+  swiper_user_id?: string;
+  target_user_id?: string;
   swipe_type?: 'like' | 'nope';
-  matched_user_id?: string; // UUID, should be same as target_user_id in this context
+  matched_user_id?: string;
   matched_username?: string;
   matched_dog_image_url?: string;
 }
 
 interface CreateOrGetChatRoomArgs {
-  p_user_id_1: string; // UUID
-  p_user_id_2: string; // UUID
+  p_user_id_1: string;
+  p_user_id_2: string;
 }
 
-// The RPC create_or_get_chat_room directly returns a UUID (string)
-// Supabase client might wrap this in { data: chatRoomId }
-// For simplicity in casting, we'll expect data to be string | null
-
-const SCREEN_WIDTH = Dimensions.get('window').width;
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function FindWalkersScreen() {
   const { user } = useAuth();
@@ -45,12 +43,33 @@ export default function FindWalkersScreen() {
   const [profiles, setProfiles] = useState<ProfileCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // const [currentIndex, setCurrentIndex] = useState(0); // Managed by swiper
   const swiperRef = useRef<Swiper<ProfileCard>>(null);
+  
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  const buttonScaleAnim = useRef(new Animated.Value(1)).current;
+  const heartAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // Initial entrance animation
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [fadeAnim, slideAnim]);
 
   const fetchProfiles = useCallback(async (fetchLimit: number = 10, isInitialFetch = false) => {
     if (!user) return;
-    if (!isInitialFetch) setLoading(true); // Show loading for subsequent fetches if needed, or rely on swiper's empty state
+    if (!isInitialFetch) setLoading(true);
     setError(null);
     try {
       const { data, error: rpcError } = await supabase.rpc('get_profiles_for_swiping', {
@@ -63,17 +82,10 @@ export default function FindWalkersScreen() {
       
       console.log('Fetched profiles:', data);
       if (data && data.length > 0) {
-        // For react-native-deck-swiper, it's often better to replace the dataset
-        // or manage it carefully if appending. For simplicity, let's replace if initial,
-        // and append if not, though this might lead to duplicates if not handled by RPC.
-        // A more robust solution would be to ensure get_profiles_for_swiping excludes already seen/swiped profiles.
-        // For now, we'll append and rely on the swiper's cardKey to handle uniqueness if profiles are re-fetched.
         setProfiles(prevProfiles => {
-            const newProfileIds = new Set(data.map((p: ProfileCard) => p.user_id));
             const uniqueNewProfiles = data.filter((p: ProfileCard) => !prevProfiles.find(pp => pp.user_id === p.user_id));
             return [...prevProfiles, ...uniqueNewProfiles];
         });
-
       } else if (isInitialFetch && profiles.length === 0) {
         setError('No new profiles found at the moment. Try again later!');
       }
@@ -91,11 +103,40 @@ export default function FindWalkersScreen() {
       router.replace('/auth');
       return;
     }
-    if (profiles.length === 0) { // Only fetch initially if profiles array is empty
+    if (profiles.length === 0) {
         fetchProfiles(10, true);
     }
   }, [user, router, fetchProfiles, profiles.length]);
 
+  const animateButton = (animValue: Animated.Value) => {
+    Animated.sequence([
+      Animated.timing(animValue, {
+        toValue: 0.9,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(animValue, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const animateHeart = () => {
+    Animated.sequence([
+      Animated.timing(heartAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(heartAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
 
   const handleSwiped = async (cardIndex: number, direction: 'left' | 'right' | 'top' | 'bottom') => {
     const swipedProfile = profiles[cardIndex];
@@ -104,304 +145,372 @@ export default function FindWalkersScreen() {
       return;
     }
 
-    console.log(`Swiped ${direction} on profile: ${swipedProfile.user_id} (username: ${swipedProfile.username})`);
-
-    let mappedDirection = 'nope'; // Default to nope
-    if (direction === 'right' || direction === 'top') { // Assuming top is also a like
-      mappedDirection = 'like';
-    } else if (direction === 'left' || direction === 'bottom') { // Assuming bottom is also a nope
-      mappedDirection = 'nope';
+    if (direction === 'right') {
+      animateHeart();
     }
+
+    const swipeDirection = direction === 'right' ? 'like' : 'nope';
+    console.log(`Swiped ${swipeDirection} on ${swipedProfile.username} (${swipedProfile.user_id})`);
 
     try {
-      // Explicitly type the expected response from the RPC
-      const args: RecordSwipeArgs = {
+      const { data, error: rpcError } = await supabase.rpc('record_swipe', {
         p_target_user_id: swipedProfile.user_id,
-        p_swipe_direction: mappedDirection as 'like' | 'nope', // Ensure mappedDirection fits the type
-      };
-      
-      // Call RPC without generics, then cast the data part
-      const { data, error: swipeError } = await supabase.rpc(
-        'record_swipe',
-        args
-      );
-      const swipeResult = data as SwipeResponse | null;
+        p_swipe_direction: swipeDirection,
+      } as RecordSwipeArgs);
 
-      if (swipeError) {
-        console.error('Error recording swipe (network/postgres level):', swipeError);
-        Alert.alert('Swipe Error', `Could not record swipe: ${swipeError.message}`);
-        return;
+      if (rpcError) {
+        throw rpcError;
       }
 
-      console.log('RPC call successful, result:', swipeResult);
+      const response = data as SwipeResponse;
+      console.log('Swipe response:', response);
 
-      if (swipeResult && swipeResult.status === 'match_created') {
-        const matchedUsername = swipeResult.matched_username || swipedProfile.username || 'a fellow dog lover';
+      if (response.status === 'match_created') {
         Alert.alert(
-          "It's a Match!",
-          `You and ${matchedUsername} are now buddies! Taking you to chat...`,
-          [{
-            text: 'Go to Chat',
-            onPress: async () => {
-              if (!user || !swipeResult.matched_user_id) {
-                Alert.alert("Error", "Could not initiate chat. User details missing.");
-                return;
-              }
-              try {
-                const chatRoomArgs: CreateOrGetChatRoomArgs = {
-                  p_user_id_1: user.id,
-                  p_user_id_2: swipeResult.matched_user_id,
-                };
-                console.log('Calling create_or_get_chat_room with:', chatRoomArgs);
-                const { data: chatRoomId, error: chatRoomError } = await supabase.rpc(
-                  'create_or_get_chat_room',
-                  chatRoomArgs
-                );
-                const actualChatRoomId = chatRoomId as string | null; // RPC returns UUID directly
+          '🎉 It\'s a Match!',
+          `You and ${response.matched_username || swipedProfile.username} liked each other!`,
+          [
+            {
+              text: 'Keep Swiping',
+              style: 'cancel',
+            },
+            {
+              text: 'Start Chatting',
+              onPress: async () => {
+                try {
+                  const { data: chatRoomId, error: chatError } = await supabase.rpc('create_or_get_chat_room', {
+                    p_user_id_1: user.id,
+                    p_user_id_2: swipedProfile.user_id,
+                  } as CreateOrGetChatRoomArgs);
 
-                if (chatRoomError) {
-                  console.error('Error creating or getting chat room:', chatRoomError);
-                  Alert.alert('Chat Error', `Could not open chat: ${chatRoomError.message}`);
-                  return;
-                }
+                  if (chatError) {
+                    throw chatError;
+                  }
 
-                if (actualChatRoomId) {
-                  console.log('Obtained chat_room_id:', actualChatRoomId);
-                  // Navigate to the chat screen using object syntax for typed routes
-                  router.push({
-                    pathname: '/chat/[chatRoomId]', // Path to the dynamic route file
-                    params: { chatRoomId: actualChatRoomId, matchedUserName: matchedUsername },
-                  });
-                } else {
-                  Alert.alert('Chat Error', 'Could not retrieve chat room ID.');
+                  if (chatRoomId) {
+                    router.push(`/chat/${chatRoomId}` as any);
+                  } else {
+                    Alert.alert('Error', 'Failed to create chat room. Please try again.');
+                  }
+                } catch (chatErr: any) {
+                  console.error('Error creating chat room:', chatErr);
+                  Alert.alert('Error', `Failed to start chat: ${chatErr.message}`);
                 }
-              } catch (e: any) {
-                console.error('Exception calling create_or_get_chat_room:', e);
-                Alert.alert('Chat Error', 'An unexpected error occurred while trying to start the chat.');
-              }
-            }
-          }]
+              },
+            },
+          ]
         );
-      } else if (swipeResult && swipeResult.status === 'error') {
-        console.error('Error from record_swipe RPC logic:', swipeResult.message);
-        Alert.alert('Swipe Error', swipeResult.message || 'An issue occurred while processing your swipe.');
-      } else if (swipeResult && swipeResult.status === 'swipe_recorded') {
-        console.log('Swipe recorded, no match yet. Details:', swipeResult);
-      } else {
-        // This case should ideally not be reached if the RPC always returns a valid structure
-        console.warn('Unexpected swipe result structure:', swipeResult);
       }
-
     } catch (e: any) {
-      console.error('Exception calling record_swipe:', e);
-      Alert.alert('Swipe Failed', 'An unexpected error occurred. Please try again.');
-    }
-  };
-
-  const handleForceMatch = async () => {
-    if (!user) {
-      Alert.alert("Not Logged In", "You need to be logged in to force a match.");
-      return;
-    }
-    if (profiles.length === 0) {
-      Alert.alert("No Profiles", "No profiles available to force a match with.");
-      return;
+      console.error('Error recording swipe:', e);
+      Alert.alert('Error', `Failed to record swipe: ${e.message}`);
     }
 
-    const targetProfile = profiles[0]; // Match with the first available profile
-    const targetUsername = targetProfile.username || 'Demo User';
-
-    Alert.alert(
-      "Forcing Demo Match",
-      `Attempting to match you with ${targetUsername}. This will take you to chat.`,
-      [{
-        text: 'Proceed',
-        onPress: async () => {
-          try {
-            const chatRoomArgs: CreateOrGetChatRoomArgs = {
-              p_user_id_1: user.id,
-              p_user_id_2: targetProfile.user_id,
-            };
-            console.log('[FORCE MATCH] Calling create_or_get_chat_room with:', chatRoomArgs);
-            const { data: chatRoomId, error: chatRoomError } = await supabase.rpc(
-              'create_or_get_chat_room',
-              chatRoomArgs
-            );
-            const actualChatRoomId = chatRoomId as string | null;
-
-            if (chatRoomError) {
-              console.error('[FORCE MATCH] Error creating or getting chat room:', chatRoomError);
-              Alert.alert('Chat Error', `Could not open chat: ${chatRoomError.message}`);
-              return;
-            }
-
-            if (actualChatRoomId) {
-              console.log('[FORCE MATCH] Obtained chat_room_id:', actualChatRoomId);
-              router.push({
-                pathname: '/chat/[chatRoomId]',
-                params: { chatRoomId: actualChatRoomId, matchedUserName: targetUsername },
-              });
-            } else {
-              Alert.alert('Chat Error', 'Could not retrieve chat room ID for forced match.');
-            }
-          } catch (e: any) {
-            console.error('[FORCE MATCH] Exception:', e);
-            Alert.alert('Chat Error', 'An unexpected error occurred while trying to force the match.');
-          }
-        }
-      },
-      { text: 'Cancel', style: 'cancel' }
-      ]
-    );
+    if (profiles.length - cardIndex <= 3) {
+      fetchProfiles(5, false);
+    }
   };
 
   const onSwipedAll = () => {
-    console.log('Swiped all cards!');
-    // Optionally fetch more profiles here or show a "no more profiles" message
-    // For now, we'll rely on the refresh button or re-entering the screen.
-    // Or, fetch more profiles:
-    // fetchProfiles(10); // Fetch another batch
-    setError('You have seen all available profiles for now. Try refreshing!');
+    console.log('All cards swiped');
+    fetchProfiles(10, false);
   };
-  
+
   const renderCard = (cardData: ProfileCard | undefined, cardIndex: number) => {
     if (!cardData) {
-      return <View style={styles.card}><ActivityIndicator /></View>; // Or some placeholder
-    }
-    return (
-      <View style={styles.card}>
-        {cardData.matcher_dog_image_url ? (
-          <Image source={{ uri: cardData.matcher_dog_image_url }} style={styles.dogImage} resizeMode="cover" />
-        ) : (
-          <View style={styles.imagePlaceholder}><Text>No Image</Text></View>
-        )}
-        <View style={styles.bioContainer}>
-          <Text style={styles.usernameText} numberOfLines={1}>{cardData.username || 'User'}</Text>
-          <Text style={styles.bioText} numberOfLines={4}>{cardData.matcher_bio || 'No bio provided.'}</Text>
+      return (
+        <View style={styles.card}>
+          <View style={styles.imagePlaceholder}>
+            <Text>No Profile Data</Text>
+          </View>
         </View>
-      </View>
+      );
+    }
+
+    return (
+      <Animated.View 
+        style={[
+          styles.card,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }],
+          },
+        ]}
+      >
+        <View style={styles.cardImageContainer}>
+          {cardData.matcher_dog_image_url ? (
+            <Image source={{ uri: cardData.matcher_dog_image_url }} style={styles.dogImage} />
+          ) : (
+            <LinearGradient
+              colors={['#667eea', '#764ba2']}
+              style={styles.imagePlaceholder}
+            >
+              <Ionicons name="paw" size={60} color="white" />
+              <Text style={styles.placeholderText}>No Photo</Text>
+            </LinearGradient>
+          )}
+          
+          {/* Gradient overlay for better text readability */}
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.7)']}
+            style={styles.cardOverlay}
+          />
+          
+          {/* User info overlay */}
+          <View style={styles.cardInfo}>
+            <Text style={styles.usernameText}>{cardData.username}</Text>
+            {cardData.matcher_bio && (
+              <Text style={styles.bioText} numberOfLines={3}>
+                {cardData.matcher_bio}
+              </Text>
+            )}
+          </View>
+        </View>
+      </Animated.View>
     );
   };
 
-  if (!user) {
-    return <View style={styles.container}><Text>Redirecting...</Text></View>;
-  }
-  
   if (loading && profiles.length === 0) {
-    return <View style={styles.centered}><ActivityIndicator size="large" /></View>;
-  }
-
-  // Error state when initial fetch fails
-  if (error && profiles.length === 0) {
     return (
-        <View style={styles.centered}>
-            <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity onPress={() => fetchProfiles(10, true)} style={styles.refreshButton}>
-                <Text style={styles.refreshButtonText}>Try Again</Text>
-            </TouchableOpacity>
-        </View>
+      <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
+        <SafeAreaView style={styles.centered}>
+          <Animated.View style={{ opacity: fadeAnim }}>
+            <ActivityIndicator size="large" color="white" />
+            <Text style={styles.loadingText}>Finding amazing dog walkers...</Text>
+          </Animated.View>
+        </SafeAreaView>
+      </LinearGradient>
     );
   }
-  
-  // This handles the case where profiles array is empty after initial load (no error, just no profiles)
-  // OR when all profiles have been swiped (swiper's onSwipedAll might have been called)
-  // The Swiper component itself will render its own "no more cards" state if cards run out.
-  // So, we might not need this specific check if the swiper handles it gracefully.
-  // However, if fetchProfiles initially returns empty and sets an error, that's handled above.
+
+  if (error) {
+    return (
+      <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
+        <SafeAreaView style={styles.centered}>
+          <Animated.View style={[styles.errorContainer, { opacity: fadeAnim }]}>
+            <Ionicons name="sad-outline" size={80} color="white" />
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity 
+              style={styles.refreshButton} 
+              onPress={() => fetchProfiles(10, true)}
+            >
+              <LinearGradient
+                colors={['#FF6B6B', '#FF8E53']}
+                style={styles.refreshButtonGradient}
+              >
+                <Text style={styles.refreshButtonText}>Try Again</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </Animated.View>
+        </SafeAreaView>
+      </LinearGradient>
+    );
+  }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.header}>Find Dog Walking Buddies</Text>
-      {profiles.length > 0 ? (
-        <Swiper
-          ref={swiperRef}
-          cards={profiles}
-          renderCard={renderCard}
-          onSwipedLeft={(cardIndex) => handleSwiped(cardIndex, 'left')}
-          onSwipedRight={(cardIndex) => handleSwiped(cardIndex, 'right')}
-          onSwipedTop={(cardIndex) => handleSwiped(cardIndex, 'top')} // Or treat as like
-          onSwipedBottom={(cardIndex) => handleSwiped(cardIndex, 'bottom')} // Or treat as dislike
-          onSwipedAll={onSwipedAll}
-          cardIndex={0} // Start from the first card
-          backgroundColor={'transparent'} // Make swiper background transparent
-          stackSize={3} // Number of cards visible in stack
-          stackSeparation={15}
-          animateOverlayLabelsOpacity
-          animateCardOpacity
-          swipeBackCard
-          overlayLabels={{
-            bottom: { title: 'NOPE', style: { label: styles.overlayLabelNope, wrapper: styles.overlayWrapper }},
-            left: { title: 'NOPE', style: { label: styles.overlayLabelNope, wrapper: styles.overlayWrapper }},
-            right: { title: 'LIKE', style: { label: styles.overlayLabelLike, wrapper: styles.overlayWrapper }},
-            top: { title: 'SUPER LIKE', style: { label: styles.overlayLabelSuperLike, wrapper: styles.overlayWrapper }},
-          }}
-          // cardKey="user_id" // Removed as it might not be a valid prop for Swiper component itself
-                           // The key for individual cards is handled by React if needed within renderCard,
-                           // but Swiper manages its children's identity.
-        />
-      ) : (
-        // This view is shown if profiles array is empty after the initial load attempt (and not loading)
-        // It could also be shown if an error occurred and was cleared, but profiles remain empty.
-        <View style={styles.centered}>
-          <Text>{loading ? 'Loading...' : (error || 'No profiles available right now. Pull down to refresh or try again later.')}</Text>
-          {!loading && (
-            <TouchableOpacity onPress={() => fetchProfiles(10, true)} style={styles.refreshButton}>
-                <Text style={styles.refreshButtonText}>Refresh</Text>
-            </TouchableOpacity>
+    <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
+      <SafeAreaView style={styles.container}>
+        {/* Header */}
+        <Animated.View 
+          style={[
+            styles.header,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
+        >
+          <Text style={styles.headerTitle}>Find Dog Walkers</Text>
+          <Text style={styles.headerSubtitle}>Swipe to connect with fellow dog lovers</Text>
+        </Animated.View>
+
+        {/* Floating heart animation */}
+        <Animated.View 
+          style={[
+            styles.floatingHeart,
+            {
+              opacity: heartAnim,
+              transform: [
+                {
+                  scale: heartAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.5, 1.5],
+                  }),
+                },
+                {
+                  translateY: heartAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, -50],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <Ionicons name="heart" size={60} color="#FF69B4" />
+        </Animated.View>
+
+        {/* Card Stack */}
+        <View style={styles.cardContainer}>
+          {profiles.length > 0 ? (
+            <Swiper
+              ref={swiperRef}
+              cards={profiles}
+              renderCard={renderCard}
+              onSwiped={(cardIndex: number) => {
+                // We need to determine direction from the swiper's internal state
+                // For now, we'll handle this differently since the swiper doesn't provide direction
+                console.log('Card swiped at index:', cardIndex);
+              }}
+              onSwipedLeft={(cardIndex: number) => handleSwiped(cardIndex, 'left')}
+              onSwipedRight={(cardIndex: number) => handleSwiped(cardIndex, 'right')}
+              onSwipedTop={(cardIndex: number) => handleSwiped(cardIndex, 'top')}
+              onSwipedAll={onSwipedAll}
+              cardIndex={0}
+              backgroundColor="transparent"
+              stackSize={3}
+              stackScale={10}
+              stackSeparation={15}
+              animateOverlayLabelsOpacity
+              animateCardOpacity
+              swipeBackCard
+              overlayLabels={{
+                left: {
+                  title: 'NOPE',
+                  style: {
+                    label: styles.overlayLabelNope,
+                    wrapper: styles.overlayWrapper,
+                  },
+                },
+                right: {
+                  title: 'LIKE',
+                  style: {
+                    label: styles.overlayLabelLike,
+                    wrapper: styles.overlayWrapper,
+                  },
+                },
+                top: {
+                  title: 'SUPER LIKE',
+                  style: {
+                    label: styles.overlayLabelSuperLike,
+                    wrapper: styles.overlayWrapper,
+                  },
+                },
+              }}
+              cardVerticalMargin={20}
+              cardHorizontalMargin={20}
+            />
+          ) : (
+            <Animated.View style={[styles.noCardsContainer, { opacity: fadeAnim }]}>
+              <Ionicons name="paw-outline" size={100} color="rgba(255,255,255,0.7)" />
+              <Text style={styles.noCardsText}>No more profiles to show</Text>
+              <Text style={styles.noCardsSubtext}>Check back later for new dog walkers!</Text>
+            </Animated.View>
           )}
         </View>
-      )}
-      {/* Manual swipe buttons if needed, or remove if only gesture swipe is desired */}
-      {profiles.length > 0 && (
-        <View style={styles.swipeButtons}>
-            <TouchableOpacity onPress={() => swiperRef.current?.swipeLeft()} style={[styles.swipeButton, styles.dislikeButton]}>
-                <Text style={styles.swipeButtonText}>NOPE</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => swiperRef.current?.swipeRight()} style={[styles.swipeButton, styles.likeButton]}>
-                <Text style={styles.swipeButtonText}>LIKE</Text>
-            </TouchableOpacity>
-        </View>
-      )}
 
-      {/* Temporary button for forcing a match */}
-      {profiles.length > 0 && (
-        <TouchableOpacity onPress={handleForceMatch} style={styles.forceMatchButton}>
-          <Text style={styles.forceMatchButtonText}>Force Match w/ First Profile (Demo)</Text>
-        </TouchableOpacity>
-      )}
-    </View>
+        {/* Action Buttons */}
+        {profiles.length > 0 && (
+          <Animated.View 
+            style={[
+              styles.actionButtons,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+              },
+            ]}
+          >
+            <Animated.View style={{ transform: [{ scale: buttonScaleAnim }] }}>
+              <TouchableOpacity 
+                style={styles.actionButton}
+                onPress={() => {
+                  animateButton(buttonScaleAnim);
+                  swiperRef.current?.swipeLeft();
+                }}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={['#FF6B6B', '#FF8E53']}
+                  style={styles.actionButtonGradient}
+                >
+                  <Ionicons name="close" size={30} color="white" />
+                </LinearGradient>
+              </TouchableOpacity>
+            </Animated.View>
+
+            <Animated.View style={{ transform: [{ scale: buttonScaleAnim }] }}>
+              <TouchableOpacity 
+                style={[styles.actionButton, styles.superLikeButton]}
+                onPress={() => {
+                  animateButton(buttonScaleAnim);
+                  swiperRef.current?.swipeTop();
+                }}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={['#00BFFF', '#0080FF']}
+                  style={styles.actionButtonGradient}
+                >
+                  <Ionicons name="star" size={25} color="white" />
+                </LinearGradient>
+              </TouchableOpacity>
+            </Animated.View>
+
+            <Animated.View style={{ transform: [{ scale: buttonScaleAnim }] }}>
+              <TouchableOpacity 
+                style={styles.actionButton}
+                onPress={() => {
+                  animateButton(buttonScaleAnim);
+                  animateHeart();
+                  swiperRef.current?.swipeRight();
+                }}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={['#4CAF50', '#45a049']}
+                  style={styles.actionButtonGradient}
+                >
+                  <Ionicons name="heart" size={30} color="white" />
+                </LinearGradient>
+              </TouchableOpacity>
+            </Animated.View>
+          </Animated.View>
+        )}
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
   header: {
-    fontSize: 22,
+    padding: 20,
+    backgroundColor: 'transparent',
+  },
+  headerTitle: {
+    fontSize: 24,
     fontWeight: 'bold',
-    textAlign: 'center',
-    paddingVertical: 20,
-    backgroundColor: '#FFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEE'
+    color: 'white',
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.7)',
   },
   cardContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
   card: {
-    // flex: 1, // Make card take available space in swiper container
-    height: SCREEN_WIDTH * 1.3, // Made cards taller
+    width: SCREEN_WIDTH - 40,
+    height: SCREEN_WIDTH - 40,
     borderRadius: 20,
     backgroundColor: 'white',
     shadowColor: '#000',
@@ -409,92 +518,95 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
-    overflow: 'hidden', // Ensures image corners are rounded
+    overflow: 'hidden',
+  },
+  cardImageContainer: {
+    flex: 1,
+    borderRadius: 20,
+    overflow: 'hidden',
   },
   dogImage: {
     width: '100%',
-    height: '70%', // Adjust image vs bio proportion
+    height: '100%',
+    resizeMode: 'cover',
   },
   imagePlaceholder: {
     width: '100%',
-    height: '70%',
-    backgroundColor: '#E0E0E0',
+    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  bioContainer: {
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    flex: 1, // Allow bio to take remaining space
+  placeholderText: {
+    fontSize: 18,
+    color: 'white',
+  },
+  cardOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+    borderRadius: 20,
+  },
+  cardInfo: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
   },
   usernameText: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#444',
-    marginBottom: 5,
+    color: 'white',
   },
   bioText: {
-    fontSize: 15,
-    color: '#555',
-    lineHeight: 20,
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.7)',
   },
-  swipeButtons: {
+  actionButtons: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     width: '100%',
-    marginTop: 20,
-    paddingHorizontal: 30,
+    padding: 20,
   },
-  swipeButton: {
-    paddingVertical: 15,
-    paddingHorizontal: 30,
+  actionButton: {
+    width: 60,
+    height: 60,
     borderRadius: 30,
-    alignItems: 'center',
     justifyContent: 'center',
-  },
-  dislikeButton: {
-    backgroundColor: '#FF69B4', // Hot Pink
-  },
-  likeButton: {
-    backgroundColor: '#32CD32', // Lime Green
-  },
-  swipeButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  errorText: {
-    color: 'red',
-    textAlign: 'center',
-    fontSize: 16,
-  },
-  refreshButton: {
-    marginTop: 20,
-    backgroundColor: '#FF6B6B',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-  },
-  refreshButtonText: {
-    color: 'white',
-    fontSize: 16,
-  },
-  forceMatchButton: {
-    backgroundColor: 'purple',
-    padding: 10,
-    borderRadius: 5,
-    marginHorizontal: 20,
-    marginVertical: 10,
     alignItems: 'center',
   },
-  forceMatchButtonText: {
+  actionButtonGradient: {
+    flex: 1,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  superLikeButton: {
+    backgroundColor: '#00BFFF',
+  },
+  floatingHeart: {
+    position: 'absolute',
+    top: 50,
+    left: SCREEN_WIDTH / 2 - 30,
+  },
+  noCardsContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  noCardsText: {
+    fontSize: 20,
     color: 'white',
-    fontWeight: 'bold',
+  },
+  noCardsSubtext: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.7)',
   },
   overlayLabelNope: {
     fontSize: 45,
     fontWeight: 'bold',
-    color: '#FF69B4', // Hot Pink
+    color: '#FF69B4',
     borderColor: '#FF69B4',
     borderWidth: 2,
     padding: 10,
@@ -503,7 +615,7 @@ const styles = StyleSheet.create({
   overlayLabelLike: {
     fontSize: 45,
     fontWeight: 'bold',
-    color: '#32CD32', // Lime Green
+    color: '#32CD32',
     borderColor: '#32CD32',
     borderWidth: 2,
     padding: 10,
@@ -512,7 +624,7 @@ const styles = StyleSheet.create({
   overlayLabelSuperLike: {
     fontSize: 45,
     fontWeight: 'bold',
-    color: '#00BFFF', // Deep Sky Blue
+    color: '#00BFFF',
     borderColor: '#00BFFF',
     borderWidth: 2,
     padding: 10,
@@ -523,5 +635,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
-  }
+  },
+  loadingText: {
+    fontSize: 18,
+    color: 'white',
+    marginTop: 20,
+  },
+  errorContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    fontSize: 18,
+    color: 'white',
+    marginTop: 20,
+  },
+  refreshButton: {
+    marginTop: 20,
+    backgroundColor: 'transparent',
+    padding: 10,
+    borderRadius: 10,
+  },
+  refreshButtonGradient: {
+    flex: 1,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  refreshButtonText: {
+    fontSize: 16,
+    color: 'white',
+  },
 });

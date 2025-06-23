@@ -48,25 +48,52 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="leaderboard"
+        name="camera"
         options={{
-          title: 'Leaderboard',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="trophy.fill" color={color} />,
+          title: 'Camera',
+          tabBarIcon: ({ color, focused }) => (
+            <View 
+              style={{
+                width: 60,
+                height: 60,
+                borderRadius: 30,
+                backgroundColor: focused ? '#7B4B94' : '#667eea',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 20,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.3,
+                shadowRadius: 8,
+                elevation: 8,
+              }}
+            >
+              <IconSymbol size={32} name="camera.fill" color="white" />
+            </View>
+          ),
+          tabBarLabelStyle: { fontSize: 0 }, // Hide the label for camera tab
         }}
       />
       <Tabs.Screen
-        name="find-walkers" // This will look for app/(tabs)/find-walkers.tsx
+        name="find-walkers"
         options={{
           title: 'Find Walkers',
           tabBarIcon: ({ color }) => (
             <View className="flex items-center justify-center rounded-full bg-purple-100/10 p-0.5">
               <IconSymbol
                 size={28}
-                name="figure.walk" // Example icon, change as needed
+                name="heart.fill"
                 color={color}
               />
             </View>
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="leaderboard"
+        options={{
+          title: 'Leaderboard',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="trophy.fill" color={color} />,
         }}
       />
     </Tabs>
